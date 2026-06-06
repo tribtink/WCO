@@ -1,0 +1,1442 @@
+// background.js — Substrate Supervisor (MV3-safe, lazy init)
+
+let substrateTabId = null;
+let heartbeatStarted = false;
+let lastHeartbeat = Date.now();
+
+const HEARTBEAT_INTERVAL = 3000; // 3 seconds
+const HEARTBEAT_TIMEOUT = 8000;  // 8 seconds
+
+// Create substrate.html tab only when needed
+async function ensureSubstrateTab() {
+  if (substrateTabId !== null) return;
+
+  const tab = await chrome.tabs.create({
+    url: chrome.runtime.getURL("substrate.html"),
+    active: false
+  });
+
+  substrateTabId = tab.id;
+  console.log("[background] substrate tab created:", substrateTabId);
+}
+
+// Ask substrate-runtime to init (idempotent)
+async function ensureSubstrateRuntime() {
+  chrome.runtime.sendMessage({ kind: "substrate.init" }, () => {});
+}
+
+// Heartbeat loop: ask substrate to tick
+async function heartbeatLoop() {
+  if (!heartbeatStarted) return; // safety
+
+  await ensureSubstrateTab();
+
+  try {
+    await ensureSubstrateRuntime();
+
+    chrome.runtime.sendMessage({ kind: "substrate.tick" }, (res) => {
+      if (res && res.ok) {
+        lastHeartbeat = Date.now();
+        if (Array.isArray(res.actions)) {
+          handleActions(res.actions);
+        }
+      }
+    });
+  } catch (err) {
+    console.error("[WCO] Substrate tick failed:", err);
+  }
+
+  if (Date.now() - lastHeartbeat > HEARTBEAT_TIMEOUT) {
+    console.warn("[WCO] Substrate unresponsive — requesting shutdown...");
+    chrome.runtime.sendMessage({ kind: "substrate.shutdown" }, () => {});
+    lastHeartbeat = Date.now();
+  }
+
+  setTimeout(heartbeatLoop, HEARTBEAT_INTERVAL);
+}
+
+// Start heartbeat once, on demand
+function startHeartbeat() {
+  if (heartbeatStarted) return;
+  heartbeatStarted = true;
+  heartbeatLoop();
+}
+
+// User clicks extension icon → boot substrate lazily
+chrome.action.onClicked.addListener(async () => {
+  await ensureSubstrateTab();
+  startHeartbeat();
+
+  // Optional: bring substrate tab to front on first click
+  if (substrateTabId !== null) {
+    chrome.tabs.update(substrateTabId, { active: true });
+  }
+});
+
+// Browser → Substrate: forward DOM events
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg && msg.kind === "browser.event") {
+    chrome.runtime.sendMessage(
+      { kind: "substrate.browserEvent", event: msg.event },
+      () => {}
+    );
+    sendResponse({ ok: true });
+    return true;
+  }
+
+  if (!msg || !msg.kind) return;
+
+  switch (msg.kind) {
+    case "popup.listModules":
+      chrome.runtime.sendMessage({ kind: "substrate.init" }, () => {
+        // substrate-runtime can expose listModules via another message if needed
+        // or you can store module list in storage and read it here
+        sendResponse({ modules: [] });
+      });
+      return true;
+
+    case "popup.reboot":
+      chrome.runtime.sendMessage({ kind: "substrate.shutdown" }, () => {
+        chrome.runtime.sendMessage({ kind: "substrate.init" }, () => {
+          sendResponse({ ok: true });
+        });
+      });
+      return true;
+
+    default:
+      console.warn("[WCO] Unknown popup message:", msg);
+  }
+});
+
+// Substrate → Browser: execute actions
+function handleActions(actions) {
+  for (const act of actions) {
+    switch (act.type) {
+      case "overlay.highlight":
+        chrome.tabs.sendMessage(act.tabId, {
+          kind: "overlay.highlight",
+          x: act.x,
+          y: act.y
+        });
+        break;
+
+      case "log":
+        console.log("[WCO Action]", act.message);
+        break;
+
+      default:
+        console.warn("[WCO] Unknown action:", act);
+    }
+  }
+}
+
+{
+  "manifest_version": 3,
+  "name": "WCO Substrate",
+  "version": "0.2",
+
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+
+  "action": {
+    "default_title": "WCO Substrate"
+  },
+
+  "permissions": [
+    "tabs",
+    "storage",
+    "scripting"
+  ],
+
+  "host_permissions": [
+    "<all_urls>"
+  ],
+
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "substrate.html",
+        "substrate-runtime.js",
+        "plugins.json",
+        "storage-helpers.js",
+        "substrate-glue.js",
+        "registry.js",
+        "modules/*.js"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
+
+// node-engine.js
+// Unified, preset-aware Node Engine for the WCO Substrate (physics layer only)
+
+export class NodeEngine {
+  /**
+   * @param {Object} options
+   * @param {Object} options.presets - Node presets (restrictive, open, etc.)
+   * @param {Object} deps
+   * @param {Object} [deps.schemaValidator] - Optional schema validator with validate(type, obj)
+   */
+  constructor(options = {}, deps = {}) {
+    this.presets = options.presets || {};
+    this.schemaValidator = deps.schemaValidator || null;
+  }
+
+  /**
+   * Turn a physics-surface preset into a canonical Node object
+   * that satisfies the substrate-level Node schema.
+   *
+   * Presets are intentionally minimal; this function fills in all
+   * required canonical fields.
+   *
+   * @param {Object} preset
+   * @param {string} [presetName]
+   * @returns {Object} canonical Node
+   */
+  canonicalizePreset(preset, presetName = null) {
+    const now = Date.now();
+
+    return {
+      // --- preset-driven physics surface ---
+      kind: preset.kind,
+      scope: preset.scope,
+      visibility: preset.visibility,
+      capabilities: preset.capabilities || [],
+      constraints: preset.constraints || {},
+
+      // --- canonical substrate-level fields ---
+      id: (typeof crypto !== "undefined" && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : `node-${now}-${Math.random().toString(16).slice(2)}`,
+
+      createdAt: now,
+
+      lifecycle: {
+        state: "active",
+        createdAt: now,
+        updatedAt: now
+      },
+
+      metadata: {
+        engine: "NodeEngine",
+        presetName
+      }
+    };
+  }
+
+  /**
+   * Create a canonical Node from a named preset.
+   *
+   * @param {string} presetName
+   * @returns {Object} canonical Node
+   */
+  createFromPreset(presetName) {
+    const preset = this.presets[presetName];
+    if (!preset) {
+      throw new Error(`NodeEngine: unknown preset "${presetName}"`);
+    }
+
+    const node = this.canonicalizePreset(preset, presetName);
+    this._validateCanonicalNode(node);
+    return node;
+  }
+
+  /**
+   * Create a canonical Node from an ad-hoc partial object
+   * (e.g., module-provided config), still going through the
+   * same canonicalization path.
+   *
+   * @param {Object} partial
+   * @returns {Object} canonical Node
+   */
+  createFromPartial(partial) {
+    const node = this.canonicalizePreset(partial, partial.presetName || null);
+    this._validateCanonicalNode(node);
+    return node;
+  }
+
+  /**
+   * Internal: validate against schema if a validator is provided.
+   *
+   * @param {Object} node
+   * @private
+   */
+  _validateCanonicalNode(node) {
+    if (!this.schemaValidator) return;
+
+    // Expect a schemaValidator with signature: validate("Node", obj)
+    const ok = this.schemaValidator.validate("Node", node);
+    if (!ok) {
+      const err = this.schemaValidator.errors && this.schemaValidator.errors[0];
+      const msg = err
+        ? `${err.instancePath || ""} ${err.message || "invalid Node"}`
+        : "invalid Node";
+      throw new Error(`NodeEngine: schema validation failed: ${msg}`);
+    }
+  }
+}
+
+// node-presets.js
+// Minimal physics-surface node presets for the WCO Substrate
+
+export default {
+  "$id": "https://wco.dev/presets/node-presets.json",
+  "version": "0.1",
+
+  "presets": {
+    "restrictive": {
+      kind: "node",
+      scope: "local",
+      visibility: "private",
+      emission: "summaries",
+      retention: "short",
+      integrity: "local",
+
+      // Physics verbs only — no governance verbs here
+      verbs: [],
+
+      // Capabilities required for this preset
+      requiredCapabilities: []
+    },
+
+    "open": {
+      kind: "node",
+      scope: "global",
+      visibility: "shared",
+      emission: "full",
+      retention: "long",
+      integrity: "distributed",
+
+      verbs: ["signal", "act"],
+      requiredCapabilities: ["canEmitSignals", "canAct"]
+    }
+  }
+};
+
+plugin.json format:
+  "modules": 
+    "modules/plugin-module-blank-template.js",
+    "modules/test/test.js"
+
+
+
+// registry.js - Substrate Module Manager (Level-Up Version)
+
+export const Registry = {
+  modules: new Map(),
+  contexts: new Map(),
+  middlewares: [],
+
+  use(fn) {
+    if (typeof fn === "function") this.middlewares.push(fn);
+  },
+
+  register(name, moduleApi, ctx = null) {
+    this.modules.set(name, moduleApi);
+    if (ctx) this.contexts.set(name, ctx);
+    console.log(`[Registry] Module registered: ${name}`);
+  },
+
+  async broadcast(type, payload = {}, context = {}) {
+    let currentPayload = { ...payload };
+
+    // 1. Middleware chain
+    for (const mw of this.middlewares) {
+      try {
+        const result = await mw(type, currentPayload, context);
+        if (result === false) return;
+        if (result && typeof result === "object") currentPayload = result;
+      } catch (err) {
+        console.error(`[Registry] Middleware error on ${type}:`, err);
+      }
+    }
+
+    // 2. Dispatch to modules
+    for (const [name, module] of this.modules) {
+      if (typeof module.onSignal === "function") {
+        try {
+          await module.onSignal(type, currentPayload, context);
+        } catch (err) {
+          console.error(`[Registry] Module ${name} failed on signal ${type}:`, err);
+        }
+      }
+    }
+  },
+
+  async notifyStateChanged(moduleName, newState) {
+    for (const [name, module] of this.modules) {
+      if (typeof module.onStateChanged === "function") {
+        try {
+          const ctx = this.contexts.get(name);
+          await module.onStateChanged(
+            { module: moduleName, state: newState },
+            ctx
+          );
+        } catch (err) {
+          console.error(`[Registry] Module ${name} failed onStateChanged:`, err);
+        }
+      }
+    }
+  },
+
+  async shutdownAll() {
+    for (const [name, module] of this.modules) {
+      if (typeof module.onShutdown === "function") {
+        const ctx = this.contexts.get(name);
+        await module.onShutdown(ctx);
+      }
+    }
+    this.modules.clear();
+    this.contexts.clear();
+    this.middlewares = [];
+    console.log("[Registry] All modules shut down.");
+  }
+};
+
+export function storageGet(keys) {
+  return chrome.storage.local.get(keys);
+}
+
+export function storageSet(obj) {
+  return chrome.storage.local.set(obj);
+}
+
+export async function getLocalState() {
+  const data = await storageGet(["userState"]);
+  const s = data.userState || {};
+
+  return {
+    id: s.id || "anonymous",
+    points: s.points || 0,
+    badges: Array.isArray(s.badges) ? s.badges : [],
+    actionTotals: { ...(s.actionTotals || {}) },
+    streaks: { ...(s.streaks || {}) },
+    updatedAt: Date.now(),
+    ...s
+  };
+}
+
+export async function saveLocalState(state) {
+  await storageSet({ userState: state });
+}
+
+
+// substrate-glue.js — Substrate OS Kernel Bridge (Level-Up Version)
+
+import { Registry } from "./registry.js";
+import { getLocalState, saveLocalState } from "./storage-helpers.js";
+
+// Load plugin manifest
+async function loadManifest() {
+  const url = chrome.runtime.getURL("plugins.json");
+  const json = await fetch(url).then(r => r.json());
+  return json.modules || [];
+}
+
+export async function createSubstrate() {
+  // 1. Load Global State (namespaced per module)
+  const globalState = await getLocalState();
+
+  // 2. Context Factory — Injects OS APIs into each module
+  const initContextFactory = (moduleName) => {
+    if (!globalState[moduleName]) globalState[moduleName] = {};
+
+    const ctx = {
+      Registry,
+
+      // Event bus (modules emit → registry.broadcast)
+      Events: {
+        emit: (type, payload = {}, meta = {}) =>
+          Registry.broadcast(type, payload, meta)
+      },
+
+      // Namespaced state slice
+      state: globalState[moduleName],
+
+      // Persist module state + notify other modules
+      saveState: async (newModuleState) => {
+        globalState[moduleName] = newModuleState;
+        await saveLocalState(globalState);
+        await Registry.notifyStateChanged(moduleName, newModuleState);
+      },
+
+      // Allow module to register middleware
+      useMiddleware: (fn) => Registry.use(fn)
+    };
+
+    return ctx;
+  };
+
+  // 3. Load & Initialize Modules
+  const modules = await loadManifest();
+  const loadedNames = [];
+
+  for (const mod of modules) {
+    try {
+      const moduleUrl = chrome.runtime.getURL(mod.file);
+      const moduleImpl = (await import(moduleUrl)).default;
+
+      if (moduleImpl) {
+        const ctx = initContextFactory(mod.name);
+
+        if (typeof moduleImpl.init === "function") {
+          await moduleImpl.init(ctx);
+        }
+
+        Registry.register(mod.name, moduleImpl, ctx);
+        loadedNames.push(mod.name);
+      }
+    } catch (err) {
+      console.error(`[Glue] Failed to load module ${mod.name}:`, err);
+    }
+  }
+
+  // 4. Substrate Runtime API (glue-level)
+  return {
+    listModules: () => loadedNames,
+
+    // Browser → Substrate → Registry
+    ingestBrowserEvent: (event) => {
+      Registry.broadcast("browser.event", event, {});
+    },
+
+    // Substrate tick
+    tick: async () => {
+      await Registry.broadcast("substrate.tick", {}, {});
+      return []; // placeholder for future browser actions
+    },
+
+    // Clean shutdown
+    shutdown: async () => {
+      await Registry.shutdownAll();
+    }
+  };
+}
+
+// substrate-runtime.js
+// Full deterministic WCO Substrate Runtime (physics-first, MV3-safe)
+// Combines: physics kernel + module loader + legacy API surface
+
+import { createPhysicsLayer } from "./physics/physics-index.js";
+
+async function loadModulesFromJSON() {
+  const url = chrome.runtime.getURL("plugins.json");
+  const res = await fetch(url);
+  const data = await res.json();
+
+  const loaded = [];
+
+  for (const path of data.modules) {
+    const moduleURL = chrome.runtime.getURL(path);
+    const mod = await import(moduleURL);
+    loaded.push(mod.default);
+  }
+
+  return loaded;
+}
+
+let initialized = false;
+let shuttingDown = false;
+
+let physics = null;
+let ctx = null;
+let loadedModules = [];
+const moduleContexts = new Map();
+
+// ---------------------------------------------------------------------------
+// 1. Build global + per-module contexts
+// ---------------------------------------------------------------------------
+function buildCtx(physics) {
+  const ctx = {
+    physics,
+    now: () => Date.now(),
+    log: (...a) => console.log("[substrate]", ...a),
+    warn: (...a) => console.warn("[substrate]", ...a),
+    error: (...a) => console.error("[substrate]", ...a),
+  };
+
+  // Expose all physics engines directly
+  for (const [key, engine] of Object.entries(physics)) {
+    ctx[key] = engine;
+  }
+
+  return ctx;
+}
+
+function buildModuleCtx(globalCtx, moduleName) {
+  const moduleCtx = Object.create(globalCtx);
+
+  moduleCtx.module = moduleName;
+
+  moduleCtx.log = (...a) => globalCtx.log(`[${moduleName}]`, ...a);
+  moduleCtx.warn = (...a) => globalCtx.warn(`[${moduleName}]`, ...a);
+  moduleCtx.error = (...a) => globalCtx.error(`[${moduleName}]`, ...a);
+
+  return moduleCtx;
+}
+
+// ---------------------------------------------------------------------------
+// 2. INIT (legacy API)
+// ---------------------------------------------------------------------------
+async function init(options = {}) {
+  if (initialized) return { ok: true };
+  initialized = true;
+
+  physics = createPhysicsLayer(options);
+  ctx = buildCtx(physics);
+
+  ctx.log("Initializing substrate runtime…");
+
+  loadedModules = await loadModulesFromJSON();
+
+  for (const mod of loadedModules) {
+    const name = mod.name || mod.id || "anonymous-module";
+    const moduleCtx = buildModuleCtx(ctx, name);
+
+    moduleContexts.set(mod, moduleCtx);
+
+    if (typeof mod.init === "function") {
+      await mod.init(moduleCtx);
+    }
+  }
+
+  ctx.log("Substrate runtime initialized.");
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// 3. TICK (legacy API)
+// ---------------------------------------------------------------------------
+async function tick() {
+  if (!initialized || shuttingDown) return { ok: false };
+  if (!physics) return { ok: false };
+
+  // Run physics tick handlers
+  physics.tick.handlers.forEach(fn => fn());
+
+  // Notify modules
+  for (const mod of loadedModules) {
+    if (typeof mod.onTick === "function") {
+      const moduleCtx = moduleContexts.get(mod) || ctx;
+      await mod.onTick(moduleCtx);
+    }
+  }
+
+  return {
+    ok: true,
+    actions: [] // background.js expects this
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 4. INGEST BROWSER EVENT (legacy API)
+// ---------------------------------------------------------------------------
+async function ingestBrowserEvent(event) {
+  if (!initialized || shuttingDown) return { ok: false };
+  if (!physics) return { ok: false };
+
+  // Record witness (if engine supports it)
+  if (ctx.witness && ctx.witness.record) {
+    ctx.witness.record({
+      type: "browserEvent",
+      payload: event,
+      ts: ctx.now(),
+    });
+  }
+
+  // Notify modules
+  for (const mod of loadedModules) {
+    if (typeof mod.onBrowserEvent === "function") {
+      const moduleCtx = moduleContexts.get(mod) || ctx;
+      await mod.onBrowserEvent(moduleCtx, event);
+    }
+  }
+
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// 5. SHUTDOWN (legacy API)
+// ---------------------------------------------------------------------------
+async function shutdown() {
+  if (shuttingDown) return { ok: true };
+  shuttingDown = true;
+
+  ctx?.log("Shutting down substrate runtime…");
+
+  for (const mod of loadedModules) {
+    if (typeof mod.shutdown === "function") {
+      const moduleCtx = moduleContexts.get(mod) || ctx;
+      await mod.shutdown(moduleCtx);
+    }
+  }
+
+  if (physics?.tick?.stop) {
+    physics.tick.stop();
+  }
+
+  ctx?.log("Substrate runtime shut down.");
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// 6. MV3 message listener (legacy supervisor protocol)
+// ---------------------------------------------------------------------------
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  switch (msg?.kind) {
+    case "substrate.init":
+      init(msg.options).then(sendResponse);
+      break;
+
+    case "substrate.tick":
+      tick().then(sendResponse);
+      break;
+
+    case "substrate.browserEvent":
+      ingestBrowserEvent(msg.event).then(sendResponse);
+      break;
+
+    case "substrate.shutdown":
+      shutdown().then(sendResponse);
+      break;
+
+    default:
+      break;
+  }
+
+  return true; // async
+});
+
+// ---------------------------------------------------------------------------
+// 7. Export for debugging
+// ---------------------------------------------------------------------------
+export default {
+  init,
+  tick,
+  ingestBrowserEvent,
+  shutdown,
+  getCtx: () => ctx,
+  getPhysics: () => physics,
+};
+
+// witness.js
+// Canonical substrate-level Witness model (JavaScript, no TypeScript).
+// No politics, no governance, no verbs. Pure data + physics.
+
+// --- Enumerations (capability surfaces) ---
+
+export const WitnessScope = Object.freeze({
+  LOCAL: "local",
+  NATIONAL: "national",
+  REGIONAL: "regional",
+  GLOBAL: "global",
+  ARTIFACT: "artifact",
+  SWARM: "swarm",
+});
+
+export const WitnessVisibility = Object.freeze({
+  PRIVATE: "private",
+  SHARED: "shared",
+  PUBLIC: "public",
+  DELAYED_PUBLIC: "delayed-public",
+  HASHED_ONLY: "hashed-only",
+});
+
+export const WitnessEmission = Object.freeze({
+  NONE: "none",
+  HASHES: "hashes",
+  SUMMARIES: "summaries",
+  RAW: "raw",
+});
+
+export const WitnessRetention = Object.freeze({
+  SHORT: "short",
+  MEDIUM: "medium",
+  LONG: "long",
+  INDEFINITE: "indefinite",
+});
+
+export const WitnessIntegrity = Object.freeze({
+  NONE: "none",
+  LOCAL: "local",
+  NATIONAL: "national",
+  GLOBAL: "global",
+  MULTI_ANCHOR: "multi-anchor",
+});
+
+export const WitnessProcessing = Object.freeze({
+  ALLOWED: "allowed",
+  DISALLOWED: "disallowed",
+});
+
+export const WitnessLifecycle = Object.freeze({
+  ACTIVE: "active",
+  DORMANT: "dormant",
+  ARCHIVED: "archived",
+});
+
+// --- Utility: ID + timestamp ---
+
+function defaultId() {
+  // Ephemeral civic ID; you can swap this for a stronger generator later.
+  return `witness_${crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)}`;
+}
+
+function defaultCreatedAt() {
+  return new Date().toISOString();
+}
+
+// --- Validation helpers ---
+
+function assertEnum(value, enumObj, fieldName) {
+  const values = Object.values(enumObj);
+  if (!values.includes(value)) {
+    throw new Error(
+      `[Witness] Invalid value for ${fieldName}: "${value}". Expected one of: ${values.join(", ")}`
+    );
+  }
+}
+
+function assertString(value, fieldName) {
+  if (typeof value !== "string") {
+    throw new Error(`[Witness] Field "${fieldName}" must be a string, got: ${typeof value}`);
+  }
+}
+
+function assertObject(value, fieldName) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`[Witness] Field "${fieldName}" must be a plain object`);
+  }
+}
+
+// --- Canonical Witness class ---
+
+export class Witness {
+  /**
+   * Canonical Witness constructor.
+   *
+   * Fields (canonical schema):
+   * - id: ephemeral civic ID (string)
+   * - createdAt: ISO timestamp (string)
+   * - kind: always "witness"
+   * - scope: one of WitnessScope
+   * - visibility: one of WitnessVisibility
+   * - emission: one of WitnessEmission
+   * - retention: one of WitnessRetention
+   * - integrity: one of WitnessIntegrity
+   * - metadata: arbitrary module-defined object
+   * - processing: one of WitnessProcessing
+   * - lifecycle: one of WitnessLifecycle
+   */
+  constructor({
+    id = defaultId(),
+    createdAt = defaultCreatedAt(),
+    scope = WitnessScope.LOCAL,
+    visibility = WitnessVisibility.PRIVATE,
+    emission = WitnessEmission.HASHES,
+    retention = WitnessRetention.SHORT,
+    integrity = WitnessIntegrity.NONE,
+    metadata = {},
+    processing = WitnessProcessing.ALLOWED,
+    lifecycle = WitnessLifecycle.ACTIVE,
+  } = {}) {
+    // Fixed kind
+    this.kind = "witness";
+
+    // Core fields
+    this.id = id;
+    this.createdAt = createdAt;
+    this.scope = scope;
+    this.visibility = visibility;
+    this.emission = emission;
+    this.retention = retention;
+    this.integrity = integrity;
+    this.metadata = metadata;
+    this.processing = processing;
+    this.lifecycle = lifecycle;
+
+    // Validate on construction
+    this._validate();
+  }
+
+  // --- Internal validation (physics enforcement) ---
+
+  _validate() {
+    assertString(this.id, "id");
+    assertString(this.createdAt, "createdAt");
+
+    if (this.kind !== "witness") {
+      throw new Error(`[Witness] kind must always be "witness", got: "${this.kind}"`);
+    }
+
+    assertEnum(this.scope, WitnessScope, "scope");
+    assertEnum(this.visibility, WitnessVisibility, "visibility");
+    assertEnum(this.emission, WitnessEmission, "emission");
+    assertEnum(this.retention, WitnessRetention, "retention");
+    assertEnum(this.integrity, WitnessIntegrity, "integrity");
+    assertEnum(this.processing, WitnessProcessing, "processing");
+    assertEnum(this.lifecycle, WitnessLifecycle, "lifecycle");
+
+    assertObject(this.metadata, "metadata");
+  }
+
+  // --- Lifecycle transitions (still zero verbs) ---
+
+  setLifecycle(nextLifecycle) {
+    assertEnum(nextLifecycle, WitnessLifecycle, "lifecycle");
+    this.lifecycle = nextLifecycle;
+    return this;
+  }
+
+  setMetadata(metadata) {
+    assertObject(metadata, "metadata");
+    this.metadata = metadata;
+    return this;
+  }
+
+  // --- Serialization helpers ---
+
+  toJSON() {
+    return {
+      id: this.id,
+      createdAt: this.createdAt,
+      kind: this.kind,
+      scope: this.scope,
+      visibility: this.visibility,
+      emission: this.emission,
+      retention: this.retention,
+      integrity: this.integrity,
+      metadata: this.metadata,
+      processing: this.processing,
+      lifecycle: this.lifecycle,
+    };
+  }
+
+  static fromJSON(json) {
+    if (!json || typeof json !== "object") {
+      throw new Error("[Witness] fromJSON expects a plain object");
+    }
+    return new Witness(json);
+  }
+}
+
+// --- Canonical presets (spectrum) ---
+
+export const WitnessPresets = Object.freeze({
+  // Restrictive Witness
+  RESTRICTIVE: () =>
+    new Witness({
+      scope: WitnessScope.LOCAL,
+      visibility: WitnessVisibility.PRIVATE,
+      emission: WitnessEmission.HASHES,
+      retention: WitnessRetention.SHORT,
+      integrity: WitnessIntegrity.LOCAL,
+      processing: WitnessProcessing.ALLOWED,
+      lifecycle: WitnessLifecycle.ACTIVE,
+    }),
+
+  // Liberal-Restrictive Witness
+  LIBERAL_RESTRICTIVE: () =>
+    new Witness({
+      scope: WitnessScope.NATIONAL,
+      visibility: WitnessVisibility.SHARED,
+      emission: WitnessEmission.SUMMARIES,
+      retention: WitnessRetention.LONG,
+      integrity: WitnessIntegrity.NATIONAL,
+      processing: WitnessProcessing.ALLOWED,
+      lifecycle: WitnessLifecycle.ACTIVE,
+    }),
+
+  // Open Witness
+  OPEN: () =>
+    new Witness({
+      scope: WitnessScope.GLOBAL,
+      visibility: WitnessVisibility.PUBLIC,
+      emission: WitnessEmission.RAW,
+      retention: WitnessRetention.INDEFINITE,
+      integrity: WitnessIntegrity.MULTI_ANCHOR,
+      processing: WitnessProcessing.ALLOWED,
+      lifecycle: WitnessLifecycle.ACTIVE,
+    }),
+});
+
+// witness-engine.js
+// Deterministic, preset-aware Witness Engine for the WCO Substrate (physics layer only)
+
+export class WitnessEngine {
+  /**
+   * @param {Object} options
+   * @param {Object} options.presets - Witness presets (restrictive, open, etc.)
+   * @param {Object} deps
+   * @param {Object} [deps.schemaValidator] - Optional schema validator with validate(type, obj)
+   */
+  constructor(options = {}, deps = {}) {
+    this.presets = options.presets || {};
+    this.schemaValidator = deps.schemaValidator || null;
+  }
+
+  /**
+   * Turn a physics-surface preset into a canonical Witness object
+   * that satisfies the substrate-level Witness schema.
+   *
+   * Presets are intentionally minimal; this function fills in all
+   * required canonical fields.
+   *
+   * @param {Object} preset
+   * @param {string} [presetName]
+   * @returns {Object} canonical Witness
+   */
+  canonicalizePreset(preset, presetName = null) {
+    const now = Date.now();
+
+    return {
+      // --- preset-driven physics surface ---
+      kind: preset.kind,
+      scope: preset.scope,
+      visibility: preset.visibility,
+      emission: preset.emission,
+      retention: preset.retention,
+      integrity: preset.integrity,
+      protocol: preset.protocol,
+      requiredCapabilities: preset.requiredCapabilities || [],
+
+      // --- canonical substrate-level fields ---
+      id: (typeof crypto !== "undefined" && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : `witness-${now}-${Math.random().toString(16).slice(2)}`,
+
+      createdAt: now,
+
+      lifecycle: {
+        state: "active",
+        createdAt: now,
+        updatedAt: now
+      },
+
+      processing: {
+        version: 1,
+        lastProcessed: null
+      },
+
+      metadata: {
+        engine: "WitnessEngine",
+        presetName
+      }
+    };
+  }
+
+  /**
+   * Create a canonical Witness from a named preset.
+   *
+   * @param {string} presetName
+   * @returns {Object} canonical Witness
+   */
+  createFromPreset(presetName) {
+    const preset = this.presets[presetName];
+    if (!preset) {
+      throw new Error(`WitnessEngine: unknown preset "${presetName}"`);
+    }
+
+    const witness = this.canonicalizePreset(preset, presetName);
+    this._validateCanonicalWitness(witness);
+    return witness;
+  }
+
+  /**
+   * Create a canonical Witness from an ad-hoc partial object
+   * (e.g., module-provided config), still going through the
+   * same canonicalization path.
+   *
+   * @param {Object} partial
+   * @returns {Object} canonical Witness
+   */
+  createFromPartial(partial) {
+    const witness = this.canonicalizePreset(partial, partial.presetName || null);
+    this._validateCanonicalWitness(witness);
+    return witness;
+  }
+
+  /**
+   * Internal: validate against schema if a validator is provided.
+   *
+   * @param {Object} witness
+   * @private
+   */
+  _validateCanonicalWitness(witness) {
+    if (!this.schemaValidator) return;
+
+    // Expect a schemaValidator with signature: validate("Witness", obj)
+    const ok = this.schemaValidator.validate("Witness", witness);
+    if (!ok) {
+      const err = this.schemaValidator.errors && this.schemaValidator.errors[0];
+      const msg = err
+        ? `${err.instancePath || ""} ${err.message || "invalid Witness"}`
+        : "invalid Witness";
+      throw new Error(`WitnessEngine: schema validation failed: ${msg}`);
+    }
+  }
+}
+
+// witness-presets.js
+// Minimal physics-surface witness presets for the WCO Substrate
+
+export default {
+  "$id": "https://wco.dev/presets/witness-presets.json",
+  "version": "0.1",
+
+  "presets": {
+    "restrictive": {
+      kind: "witness",
+      scope: "local",
+      visibility: "private",
+      emission: "hashes",
+      retention: "short",
+      integrity: "local",
+
+      // Witnesses do not have verbs — they observe
+      protocol: [],
+
+      requiredCapabilities: []
+    },
+
+    "open": {
+      kind: "witness",
+      scope: "global",
+      visibility: "shared",
+      emission: "full",
+      retention: "long",
+      integrity: "distributed",
+
+      protocol: ["observe", "attest"],
+      requiredCapabilities: ["canObserve", "canAttest"]
+    }
+  }
+};
+@@@@@@@@@@@@@
+
+// physics/capability-engine.js
+export class CapabilityEngine {
+  constructor() {
+    this.capabilities = new Map(); // pluginName -> Set(capability)
+  }
+
+  grant(pluginName, capability) {
+    if (!this.capabilities.has(pluginName)) {
+      this.capabilities.set(pluginName, new Set());
+    }
+    this.capabilities.get(pluginName).add(capability);
+  }
+
+  has(pluginName, capability) {
+    return this.capabilities.get(pluginName)?.has(capability) ?? false;
+  }
+}
+
+export class CausalityEngine {
+  constructor(opts = {}) {
+    const {
+      node = null,
+      witness = null,
+      nodeEngine = null,
+      witnessEngine = null,
+    } = opts;
+
+    this.node = node || nodeEngine;
+    this.witness = witness || witnessEngine;
+  }
+}
+
+// physics/identity-engine.js
+export class IdentityEngine {
+  constructor() {
+    this.counter = 0;
+  }
+
+  nextId(prefix = "civic") {
+    this.counter += 1;
+    return `${prefix}-${Date.now()}-${this.counter}`;
+  }
+}
+
+// physics-index.js
+// Unified physics layer for the WCO Substrate
+
+import { NodeEngine } from "../node-engine.js";
+import { WitnessEngine } from "../witness-engine.js";
+import { TickEngine } from "./tick-engine.js";
+
+// Future axes (stubs for now)
+import { IdentityEngine } from "../physics/identity-engine.js";   // if exists
+import { CapabilityEngine } from "../physics/capability-engine.js"; // if exists
+import { CausalityEngine } from "../physics/causality-engine.js";   // if exists
+
+import witnessPresets from "../witness-presets.js";
+import nodePresets from "../node-presets.js";
+
+export function createPhysicsLayer(deps = {}) {
+  const witness = new WitnessEngine(
+    { presets: witnessPresets.presets },
+    deps
+  );
+
+  const node = new NodeEngine(
+    { presets: nodePresets?.presets || {} },
+    deps
+  );
+
+  const tick = new TickEngine();
+
+  // Stubs for now
+  const identity = new IdentityEngine();
+  const capability = new CapabilityEngine();
+  const causality = new CausalityEngine();
+
+
+  return {
+    witness,
+    node,
+    tick,
+    identity,
+    capability,
+    causality
+  };
+}
+
+// physics/tick-engine.js
+export class TickEngine {
+  constructor() {
+    this.handlers = new Set();
+    this.intervalId = null;
+  }
+
+  onTick(fn) {
+    this.handlers.add(fn);
+    return () => this.handlers.delete(fn);
+  }
+
+  start(ms = 1000) {
+    if (this.intervalId) return;
+    this.intervalId = setInterval(() => {
+      for (const fn of this.handlers) fn();
+    }, ms);
+  }
+
+  stop() {
+    if (!this.intervalId) return;
+    clearInterval(this.intervalId);
+    this.intervalId = null;
+  }
+}
+@@@@@@@@@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 10px;
+      width: 300px;
+    }
+    #core-ui {
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #ccc;
+    }
+    .module-fragment {
+      margin: 8px 0;
+      padding: 6px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background: #fafafa;
+    }
+    .module-link {
+      display: block;
+      margin: 6px 0;
+      padding: 6px;
+      background: #eee;
+      border-radius: 4px;
+      cursor: pointer;
+      text-align: center;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="core-ui">
+    <h3>WCO Substrate</h3>
+    <button id="open-substrate">Open Substrate Console</button>
+    <button id="open-advanced">Open Advanced Console</button>
+    <button id="reload-modules">Reload Modules</button>
+
+    <h4>Loaded Modules</h4>
+    <ul id="module-list"></ul>
+  </div>
+
+  <div id="module-fragments"></div>
+
+  <h4>Module Pages</h4>
+  <div id="module-pages"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
+
+// popup.js
+
+// DOM references
+const moduleList = document.getElementById("module-list");
+const moduleFragments = document.getElementById("module-fragments");
+const modulePages = document.getElementById("module-pages");
+
+// Core UI buttons
+document.getElementById("open-substrate").onclick = () => {
+  chrome.tabs.create({ url: chrome.runtime.getURL("substrate.html") });
+};
+
+document.getElementById("open-advanced").onclick = () => {
+  chrome.tabs.create({ url: chrome.runtime.getURL("substrate-advanced.html") });
+};
+
+document.getElementById("reload-modules").onclick = () => {
+  chrome.runtime.sendMessage({ kind: "popup.reboot" }, () => {
+    window.close();
+  });
+};
+
+// Request module list from background
+chrome.runtime.sendMessage({ kind: "popup.listModules" }, (res) => {
+  const modules = res?.modules || [];
+  renderModuleList(modules);
+  loadModuleFragments(modules);
+  loadModulePages(modules);
+});
+
+// Render module names
+function renderModuleList(modules) {
+  moduleList.innerHTML = "";
+  modules.forEach((m) => {
+    const li = document.createElement("li");
+    li.textContent = m.name;
+    moduleList.appendChild(li);
+  });
+}
+
+// Load small UI fragments
+function loadModuleFragments(modules) {
+  modules.forEach((m) => {
+    if (!m.ui?.popupFragment) return;
+
+    const url = chrome.runtime.getURL(m.ui.popupFragment);
+
+    fetch(url)
+      .then((r) => r.text())
+      .then((html) => {
+        const div = document.createElement("div");
+        div.className = "module-fragment";
+        div.innerHTML = html;
+        moduleFragments.appendChild(div);
+
+        if (m.ui.popupFragmentJS) {
+          import(chrome.runtime.getURL(m.ui.popupFragmentJS));
+        }
+      });
+  });
+}
+
+// Add links to full module pages
+function loadModulePages(modules) {
+  modules.forEach((m) => {
+    if (!m.ui?.popupPage) return;
+
+    const btn = document.createElement("div");
+    btn.className = "module-link";
+    btn.textContent = `Open ${m.name}`;
+    btn.onclick = () => {
+      chrome.tabs.create({
+        url: chrome.runtime.getURL(
+          `popup-module.html?module=${encodeURIComponent(m.name)}`
+        ),
+      });
+    };
+
+    modulePages.appendChild(btn);
+  });
+}
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 10px;
+      width: 350px;
+    }
+    #module-root {
+      margin-top: 10px;
+    }
+    #back {
+      margin-bottom: 12px;
+      padding: 6px 10px;
+      background: #eee;
+      border-radius: 4px;
+      cursor: pointer;
+      display: inline-block;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="back">← Back</div>
+  <h3 id="module-title">Module</h3>
+
+  <div id="module-root"></div>
+
+  <script src="popup-module.js"></script>
+</body>
+</html>
+
+// popup-module.js
+
+// Parse module name from query string
+const params = new URLSearchParams(location.search);
+const moduleName = params.get("module");
+
+const titleEl = document.getElementById("module-title");
+const rootEl = document.getElementById("module-root");
+
+// Back button → return to main popup
+document.getElementById("back").onclick = () => {
+  window.location.href = chrome.runtime.getURL("popup.html");
+};
+
+// Request module UI info from background
+chrome.runtime.sendMessage(
+  { kind: "popup.getModuleUI", module: moduleName },
+  (res) => {
+    if (!res || !res.page) {
+      rootEl.innerHTML = `<p>No UI available for module: ${moduleName}</p>`;
+      return;
+    }
+
+    titleEl.textContent = moduleName;
+
+    // Load the module's full-page HTML
+    fetch(chrome.runtime.getURL(res.page))
+      .then((r) => r.text())
+      .then((html) => {
+        rootEl.innerHTML = html;
+
+        // Load optional JS
+        if (res.js) {
+          import(chrome.runtime.getURL(res.js));
+        }
+      });
+  }
+);
+

@@ -1,0 +1,519 @@
+***does not include popup scripts or hthml
+
+// background.js — Substrate Supervisor (MV3-safe, lazy init)
+
+let substrateTabId = null;
+let heartbeatStarted = false;
+let lastHeartbeat = Date.now();
+
+const HEARTBEAT_INTERVAL = 3000; // 3 seconds
+const HEARTBEAT_TIMEOUT = 8000;  // 8 seconds
+
+// Create substrate.html tab only when needed
+async function ensureSubstrateTab() {
+  if (substrateTabId !== null) return;
+
+  const tab = await chrome.tabs.create({
+    url: chrome.runtime.getURL("substrate.html"),
+    active: false
+  });
+
+  substrateTabId = tab.id;
+  console.log("[background] substrate tab created:", substrateTabId);
+}
+
+// Ask substrate-runtime to init (idempotent)
+async function ensureSubstrateRuntime() {
+  chrome.runtime.sendMessage({ kind: "substrate.init" }, () => {});
+}
+
+// Heartbeat loop: ask substrate to tick
+async function heartbeatLoop() {
+  if (!heartbeatStarted) return; // safety
+
+  await ensureSubstrateTab();
+
+  try {
+    await ensureSubstrateRuntime();
+
+    chrome.runtime.sendMessage({ kind: "substrate.tick" }, (res) => {
+      if (res && res.ok) {
+        lastHeartbeat = Date.now();
+        if (Array.isArray(res.actions)) {
+          handleActions(res.actions);
+        }
+      }
+    });
+  } catch (err) {
+    console.error("[WCO] Substrate tick failed:", err);
+  }
+
+  if (Date.now() - lastHeartbeat > HEARTBEAT_TIMEOUT) {
+    console.warn("[WCO] Substrate unresponsive — requesting shutdown...");
+    chrome.runtime.sendMessage({ kind: "substrate.shutdown" }, () => {});
+    lastHeartbeat = Date.now();
+  }
+
+  setTimeout(heartbeatLoop, HEARTBEAT_INTERVAL);
+}
+
+// Start heartbeat once, on demand
+function startHeartbeat() {
+  if (heartbeatStarted) return;
+  heartbeatStarted = true;
+  heartbeatLoop();
+}
+
+// User clicks extension icon → boot substrate lazily
+chrome.action.onClicked.addListener(async () => {
+  await ensureSubstrateTab();
+  startHeartbeat();
+
+  // Optional: bring substrate tab to front on first click
+  if (substrateTabId !== null) {
+    chrome.tabs.update(substrateTabId, { active: true });
+  }
+});
+
+// Browser → Substrate: forward DOM events
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg && msg.kind === "browser.event") {
+    chrome.runtime.sendMessage(
+      { kind: "substrate.browserEvent", event: msg.event },
+      () => {}
+    );
+    sendResponse({ ok: true });
+    return true;
+  }
+
+  if (!msg || !msg.kind) return;
+
+  switch (msg.kind) {
+    case "popup.listModules":
+      chrome.runtime.sendMessage({ kind: "substrate.init" }, () => {
+        // substrate-runtime can expose listModules via another message if needed
+        // or you can store module list in storage and read it here
+        sendResponse({ modules: [] });
+      });
+      return true;
+
+    case "popup.reboot":
+      chrome.runtime.sendMessage({ kind: "substrate.shutdown" }, () => {
+        chrome.runtime.sendMessage({ kind: "substrate.init" }, () => {
+          sendResponse({ ok: true });
+        });
+      });
+      return true;
+
+    default:
+      console.warn("[WCO] Unknown popup message:", msg);
+  }
+});
+
+// Substrate → Browser: execute actions
+function handleActions(actions) {
+  for (const act of actions) {
+    switch (act.type) {
+      case "overlay.highlight":
+        chrome.tabs.sendMessage(act.tabId, {
+          kind: "overlay.highlight",
+          x: act.x,
+          y: act.y
+        });
+        break;
+
+      case "log":
+        console.log("[WCO Action]", act.message);
+        break;
+
+      default:
+        console.warn("[WCO] Unknown action:", act);
+    }
+  }
+}
+
+{
+  "manifest_version": 3,
+  "name": "WCO Substrate",
+  "version": "0.2",
+
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+
+  "action": {
+    "default_title": "WCO Substrate"
+  },
+
+  "permissions": [
+    "tabs",
+    "storage",
+    "scripting"
+  ],
+
+  "host_permissions": [
+    "<all_urls>"
+  ],
+
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "substrate.html",
+        "substrate-runtime.js",
+        "plugins.json",
+        "storage-helpers.js",
+        "substrate-glue.js",
+        "registry.js",
+        "modules/*.js"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
+
+// node-engine.js
+// Unified, preset-aware Node Engine for the WCO Substrate (physics layer only)
+
+export class NodeEngine {
+  /**
+   * @param {Object} options
+   * @param {Object} options.presets - Node presets (restrictive, open, etc.)
+   * @param {Object} deps
+   * @param {Object} [deps.schemaValidator] - Optional schema validator with validate(type, obj)
+   */
+  constructor(options = {}, deps = {}) {
+    this.presets = options.presets || {};
+    this.schemaValidator = deps.schemaValidator || null;
+  }
+
+  /**
+   * Turn a physics-surface preset into a canonical Node object
+   * that satisfies the substrate-level Node schema.
+   *
+   * Presets are intentionally minimal; this function fills in all
+   * required canonical fields.
+   *
+   * @param {Object} preset
+   * @param {string} [presetName]
+   * @returns {Object} canonical Node
+   */
+  canonicalizePreset(preset, presetName = null) {
+    const now = Date.now();
+
+    return {
+      // --- preset-driven physics surface ---
+      kind: preset.kind,
+      scope: preset.scope,
+      visibility: preset.visibility,
+      capabilities: preset.capabilities || [],
+      constraints: preset.constraints || {},
+
+      // --- canonical substrate-level fields ---
+      id: (typeof crypto !== "undefined" && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : `node-${now}-${Math.random().toString(16).slice(2)}`,
+
+      createdAt: now,
+
+      lifecycle: {
+        state: "active",
+        createdAt: now,
+        updatedAt: now
+      },
+
+      metadata: {
+        engine: "NodeEngine",
+        presetName
+      }
+    };
+  }
+
+  /**
+   * Create a canonical Node from a named preset.
+   *
+   * @param {string} presetName
+   * @returns {Object} canonical Node
+   */
+  createFromPreset(presetName) {
+    const preset = this.presets[presetName];
+    if (!preset) {
+      throw new Error(`NodeEngine: unknown preset "${presetName}"`);
+    }
+
+    const node = this.canonicalizePreset(preset, presetName);
+    this._validateCanonicalNode(node);
+    return node;
+  }
+
+  /**
+   * Create a canonical Node from an ad-hoc partial object
+   * (e.g., module-provided config), still going through the
+   * same canonicalization path.
+   *
+   * @param {Object} partial
+   * @returns {Object} canonical Node
+   */
+  createFromPartial(partial) {
+    const node = this.canonicalizePreset(partial, partial.presetName || null);
+    this._validateCanonicalNode(node);
+    return node;
+  }
+
+  /**
+   * Internal: validate against schema if a validator is provided.
+   *
+   * @param {Object} node
+   * @private
+   */
+  _validateCanonicalNode(node) {
+    if (!this.schemaValidator) return;
+
+    // Expect a schemaValidator with signature: validate("Node", obj)
+    const ok = this.schemaValidator.validate("Node", node);
+    if (!ok) {
+      const err = this.schemaValidator.errors && this.schemaValidator.errors[0];
+      const msg = err
+        ? `${err.instancePath || ""} ${err.message || "invalid Node"}`
+        : "invalid Node";
+      throw new Error(`NodeEngine: schema validation failed: ${msg}`);
+    }
+  }
+}
+
+// node-presets.js
+// Minimal physics-surface node presets for the WCO Substrate
+
+export default {
+  "$id": "https://wco.dev/presets/node-presets.json",
+  "version": "0.1",
+
+  "presets": {
+    "restrictive": {
+      kind: "node",
+      scope: "local",
+      visibility: "private",
+      emission: "summaries",
+      retention: "short",
+      integrity: "local",
+
+      // Physics verbs only — no governance verbs here
+      verbs: [],
+
+      // Capabilities required for this preset
+      requiredCapabilities: []
+    },
+
+    "open": {
+      kind: "node",
+      scope: "global",
+      visibility: "shared",
+      emission: "full",
+      retention: "long",
+      integrity: "distributed",
+
+      verbs: ["signal", "act"],
+      requiredCapabilities: ["canEmitSignals", "canAct"]
+    }
+  }
+};
+
+plugin.json format:
+  "modules": 
+    "modules/plugin-module-blank-template.js",
+    "modules/test/test.js"
+
+
+
+// registry.js - Substrate Module Manager (Level-Up Version)
+
+export const Registry = {
+  modules: new Map(),
+  contexts: new Map(),
+  middlewares: [],
+
+  use(fn) {
+    if (typeof fn === "function") this.middlewares.push(fn);
+  },
+
+  register(name, moduleApi, ctx = null) {
+    this.modules.set(name, moduleApi);
+    if (ctx) this.contexts.set(name, ctx);
+    console.log(`[Registry] Module registered: ${name}`);
+  },
+
+  async broadcast(type, payload = {}, context = {}) {
+    let currentPayload = { ...payload };
+
+    // 1. Middleware chain
+    for (const mw of this.middlewares) {
+      try {
+        const result = await mw(type, currentPayload, context);
+        if (result === false) return;
+        if (result && typeof result === "object") currentPayload = result;
+      } catch (err) {
+        console.error(`[Registry] Middleware error on ${type}:`, err);
+      }
+    }
+
+    // 2. Dispatch to modules
+    for (const [name, module] of this.modules) {
+      if (typeof module.onSignal === "function") {
+        try {
+          await module.onSignal(type, currentPayload, context);
+        } catch (err) {
+          console.error(`[Registry] Module ${name} failed on signal ${type}:`, err);
+        }
+      }
+    }
+  },
+
+  async notifyStateChanged(moduleName, newState) {
+    for (const [name, module] of this.modules) {
+      if (typeof module.onStateChanged === "function") {
+        try {
+          const ctx = this.contexts.get(name);
+          await module.onStateChanged(
+            { module: moduleName, state: newState },
+            ctx
+          );
+        } catch (err) {
+          console.error(`[Registry] Module ${name} failed onStateChanged:`, err);
+        }
+      }
+    }
+  },
+
+  async shutdownAll() {
+    for (const [name, module] of this.modules) {
+      if (typeof module.onShutdown === "function") {
+        const ctx = this.contexts.get(name);
+        await module.onShutdown(ctx);
+      }
+    }
+    this.modules.clear();
+    this.contexts.clear();
+    this.middlewares = [];
+    console.log("[Registry] All modules shut down.");
+  }
+};
+
+export function storageGet(keys) {
+  return chrome.storage.local.get(keys);
+}
+
+export function storageSet(obj) {
+  return chrome.storage.local.set(obj);
+}
+
+export async function getLocalState() {
+  const data = await storageGet(["userState"]);
+  const s = data.userState || {};
+
+  return {
+    id: s.id || "anonymous",
+    points: s.points || 0,
+    badges: Array.isArray(s.badges) ? s.badges : [],
+    actionTotals: { ...(s.actionTotals || {}) },
+    streaks: { ...(s.streaks || {}) },
+    updatedAt: Date.now(),
+    ...s
+  };
+}
+
+export async function saveLocalState(state) {
+  await storageSet({ userState: state });
+}
+
+
+// substrate-glue.js — Substrate OS Kernel Bridge (Level-Up Version)
+
+import { Registry } from "./registry.js";
+import { getLocalState, saveLocalState } from "./storage-helpers.js";
+
+// Load plugin manifest
+async function loadManifest() {
+  const url = chrome.runtime.getURL("plugins.json");
+  const json = await fetch(url).then(r => r.json());
+  return json.modules || [];
+}
+
+export async function createSubstrate() {
+  // 1. Load Global State (namespaced per module)
+  const globalState = await getLocalState();
+
+  // 2. Context Factory — Injects OS APIs into each module
+  const initContextFactory = (moduleName) => {
+    if (!globalState[moduleName]) globalState[moduleName] = {};
+
+    const ctx = {
+      Registry,
+
+      // Event bus (modules emit → registry.broadcast)
+      Events: {
+        emit: (type, payload = {}, meta = {}) =>
+          Registry.broadcast(type, payload, meta)
+      },
+
+      // Namespaced state slice
+      state: globalState[moduleName],
+
+      // Persist module state + notify other modules
+      saveState: async (newModuleState) => {
+        globalState[moduleName] = newModuleState;
+        await saveLocalState(globalState);
+        await Registry.notifyStateChanged(moduleName, newModuleState);
+      },
+
+      // Allow module to register middleware
+      useMiddleware: (fn) => Registry.use(fn)
+    };
+
+    return ctx;
+  };
+
+  // 3. Load & Initialize Modules
+  const modules = await loadManifest();
+  const loadedNames = [];
+
+  for (const mod of modules) {
+    try {
+      const moduleUrl = chrome.runtime.getURL(mod.file);
+      const moduleImpl = (await import(moduleUrl)).default;
+
+      if (moduleImpl) {
+        const ctx = initContextFactory(mod.name);
+
+        if (typeof moduleImpl.init === "function") {
+          await moduleImpl.init(ctx);
+        }
+
+        Registry.register(mod.name, moduleImpl, ctx);
+        loadedNames.push(mod.name);
+      }
+    } catch (err) {
+      console.error(`[Glue] Failed to load module ${mod.name}:`, err);
+    }
+  }
+
+  // 4. Substrate Runtime API (glue-level)
+  return {
+    listModules: () => loadedNames,
+
+    // Browser → Substrate → Registry
+    ingestBrowserEvent: (event) => {
+      Registry.broadcast("browser.event", event, {});
+    },
+
+    // Substrate tick
+    tick: async () => {
+      await Registry.broadcast("substrate.tick", {}, {});
+      return []; // placeholder for future browser actions
+    },
+
+    // Clean shutdown
+    shutdown: async () => {
+      await Registry.shutdownAll();
+    }
+  };
+}

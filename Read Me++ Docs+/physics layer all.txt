@@ -1,0 +1,114 @@
+// physics/capability-engine.js
+export class CapabilityEngine {
+  constructor() {
+    this.capabilities = new Map(); // pluginName -> Set(capability)
+  }
+
+  grant(pluginName, capability) {
+    if (!this.capabilities.has(pluginName)) {
+      this.capabilities.set(pluginName, new Set());
+    }
+    this.capabilities.get(pluginName).add(capability);
+  }
+
+  has(pluginName, capability) {
+    return this.capabilities.get(pluginName)?.has(capability) ?? false;
+  }
+}
+
+export class CausalityEngine {
+  constructor(opts = {}) {
+    const {
+      node = null,
+      witness = null,
+      nodeEngine = null,
+      witnessEngine = null,
+    } = opts;
+
+    this.node = node || nodeEngine;
+    this.witness = witness || witnessEngine;
+  }
+}
+
+// physics/identity-engine.js
+export class IdentityEngine {
+  constructor() {
+    this.counter = 0;
+  }
+
+  nextId(prefix = "civic") {
+    this.counter += 1;
+    return `${prefix}-${Date.now()}-${this.counter}`;
+  }
+}
+
+// physics-index.js
+// Unified physics layer for the WCO Substrate
+
+import { NodeEngine } from "../node-engine.js";
+import { WitnessEngine } from "../witness-engine.js";
+import { TickEngine } from "./tick-engine.js";
+
+// Future axes (stubs for now)
+import { IdentityEngine } from "../physics/identity-engine.js";   // if exists
+import { CapabilityEngine } from "../physics/capability-engine.js"; // if exists
+import { CausalityEngine } from "../physics/causality-engine.js";   // if exists
+
+import witnessPresets from "../witness-presets.js";
+import nodePresets from "../node-presets.js";
+
+export function createPhysicsLayer(deps = {}) {
+  const witness = new WitnessEngine(
+    { presets: witnessPresets.presets },
+    deps
+  );
+
+  const node = new NodeEngine(
+    { presets: nodePresets?.presets || {} },
+    deps
+  );
+
+  const tick = new TickEngine();
+
+  // Stubs for now
+  const identity = new IdentityEngine();
+  const capability = new CapabilityEngine();
+  const causality = new CausalityEngine();
+
+
+  return {
+    witness,
+    node,
+    tick,
+    identity,
+    capability,
+    causality
+  };
+}
+
+// physics/tick-engine.js
+export class TickEngine {
+  constructor() {
+    this.handlers = new Set();
+    this.intervalId = null;
+  }
+
+  onTick(fn) {
+    this.handlers.add(fn);
+    return () => this.handlers.delete(fn);
+  }
+
+  start(ms = 1000) {
+    if (this.intervalId) return;
+    this.intervalId = setInterval(() => {
+      for (const fn of this.handlers) fn();
+    }, ms);
+  }
+
+  stop() {
+    if (!this.intervalId) return;
+    clearInterval(this.intervalId);
+    this.intervalId = null;
+  }
+}
+

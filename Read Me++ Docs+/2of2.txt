@@ -1,0 +1,600 @@
+// substrate-runtime.js
+// Full deterministic WCO Substrate Runtime (physics-first, MV3-safe)
+// Combines: physics kernel + module loader + legacy API surface
+
+import { createPhysicsLayer } from "./physics/physics-index.js";
+
+async function loadModulesFromJSON() {
+  const url = chrome.runtime.getURL("plugins.json");
+  const res = await fetch(url);
+  const data = await res.json();
+
+  const loaded = [];
+
+  for (const path of data.modules) {
+    const moduleURL = chrome.runtime.getURL(path);
+    const mod = await import(moduleURL);
+    loaded.push(mod.default);
+  }
+
+  return loaded;
+}
+
+let initialized = false;
+let shuttingDown = false;
+
+let physics = null;
+let ctx = null;
+let loadedModules = [];
+const moduleContexts = new Map();
+
+// ---------------------------------------------------------------------------
+// 1. Build global + per-module contexts
+// ---------------------------------------------------------------------------
+function buildCtx(physics) {
+  const ctx = {
+    physics,
+    now: () => Date.now(),
+    log: (...a) => console.log("[substrate]", ...a),
+    warn: (...a) => console.warn("[substrate]", ...a),
+    error: (...a) => console.error("[substrate]", ...a),
+  };
+
+  // Expose all physics engines directly
+  for (const [key, engine] of Object.entries(physics)) {
+    ctx[key] = engine;
+  }
+
+  return ctx;
+}
+
+function buildModuleCtx(globalCtx, moduleName) {
+  const moduleCtx = Object.create(globalCtx);
+
+  moduleCtx.module = moduleName;
+
+  moduleCtx.log = (...a) => globalCtx.log(`[${moduleName}]`, ...a);
+  moduleCtx.warn = (...a) => globalCtx.warn(`[${moduleName}]`, ...a);
+  moduleCtx.error = (...a) => globalCtx.error(`[${moduleName}]`, ...a);
+
+  return moduleCtx;
+}
+
+// ---------------------------------------------------------------------------
+// 2. INIT (legacy API)
+// ---------------------------------------------------------------------------
+async function init(options = {}) {
+  if (initialized) return { ok: true };
+  initialized = true;
+
+  physics = createPhysicsLayer(options);
+  ctx = buildCtx(physics);
+
+  ctx.log("Initializing substrate runtime…");
+
+  loadedModules = await loadModulesFromJSON();
+
+  for (const mod of loadedModules) {
+    const name = mod.name || mod.id || "anonymous-module";
+    const moduleCtx = buildModuleCtx(ctx, name);
+
+    moduleContexts.set(mod, moduleCtx);
+
+    if (typeof mod.init === "function") {
+      await mod.init(moduleCtx);
+    }
+  }
+
+  ctx.log("Substrate runtime initialized.");
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// 3. TICK (legacy API)
+// ---------------------------------------------------------------------------
+async function tick() {
+  if (!initialized || shuttingDown) return { ok: false };
+  if (!physics) return { ok: false };
+
+  // Run physics tick handlers
+  physics.tick.handlers.forEach(fn => fn());
+
+  // Notify modules
+  for (const mod of loadedModules) {
+    if (typeof mod.onTick === "function") {
+      const moduleCtx = moduleContexts.get(mod) || ctx;
+      await mod.onTick(moduleCtx);
+    }
+  }
+
+  return {
+    ok: true,
+    actions: [] // background.js expects this
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 4. INGEST BROWSER EVENT (legacy API)
+// ---------------------------------------------------------------------------
+async function ingestBrowserEvent(event) {
+  if (!initialized || shuttingDown) return { ok: false };
+  if (!physics) return { ok: false };
+
+  // Record witness (if engine supports it)
+  if (ctx.witness && ctx.witness.record) {
+    ctx.witness.record({
+      type: "browserEvent",
+      payload: event,
+      ts: ctx.now(),
+    });
+  }
+
+  // Notify modules
+  for (const mod of loadedModules) {
+    if (typeof mod.onBrowserEvent === "function") {
+      const moduleCtx = moduleContexts.get(mod) || ctx;
+      await mod.onBrowserEvent(moduleCtx, event);
+    }
+  }
+
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// 5. SHUTDOWN (legacy API)
+// ---------------------------------------------------------------------------
+async function shutdown() {
+  if (shuttingDown) return { ok: true };
+  shuttingDown = true;
+
+  ctx?.log("Shutting down substrate runtime…");
+
+  for (const mod of loadedModules) {
+    if (typeof mod.shutdown === "function") {
+      const moduleCtx = moduleContexts.get(mod) || ctx;
+      await mod.shutdown(moduleCtx);
+    }
+  }
+
+  if (physics?.tick?.stop) {
+    physics.tick.stop();
+  }
+
+  ctx?.log("Substrate runtime shut down.");
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// 6. MV3 message listener (legacy supervisor protocol)
+// ---------------------------------------------------------------------------
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  switch (msg?.kind) {
+    case "substrate.init":
+      init(msg.options).then(sendResponse);
+      break;
+
+    case "substrate.tick":
+      tick().then(sendResponse);
+      break;
+
+    case "substrate.browserEvent":
+      ingestBrowserEvent(msg.event).then(sendResponse);
+      break;
+
+    case "substrate.shutdown":
+      shutdown().then(sendResponse);
+      break;
+
+    default:
+      break;
+  }
+
+  return true; // async
+});
+
+// ---------------------------------------------------------------------------
+// 7. Export for debugging
+// ---------------------------------------------------------------------------
+export default {
+  init,
+  tick,
+  ingestBrowserEvent,
+  shutdown,
+  getCtx: () => ctx,
+  getPhysics: () => physics,
+};
+
+// witness.js
+// Canonical substrate-level Witness model (JavaScript, no TypeScript).
+// No politics, no governance, no verbs. Pure data + physics.
+
+// --- Enumerations (capability surfaces) ---
+
+export const WitnessScope = Object.freeze({
+  LOCAL: "local",
+  NATIONAL: "national",
+  REGIONAL: "regional",
+  GLOBAL: "global",
+  ARTIFACT: "artifact",
+  SWARM: "swarm",
+});
+
+export const WitnessVisibility = Object.freeze({
+  PRIVATE: "private",
+  SHARED: "shared",
+  PUBLIC: "public",
+  DELAYED_PUBLIC: "delayed-public",
+  HASHED_ONLY: "hashed-only",
+});
+
+export const WitnessEmission = Object.freeze({
+  NONE: "none",
+  HASHES: "hashes",
+  SUMMARIES: "summaries",
+  RAW: "raw",
+});
+
+export const WitnessRetention = Object.freeze({
+  SHORT: "short",
+  MEDIUM: "medium",
+  LONG: "long",
+  INDEFINITE: "indefinite",
+});
+
+export const WitnessIntegrity = Object.freeze({
+  NONE: "none",
+  LOCAL: "local",
+  NATIONAL: "national",
+  GLOBAL: "global",
+  MULTI_ANCHOR: "multi-anchor",
+});
+
+export const WitnessProcessing = Object.freeze({
+  ALLOWED: "allowed",
+  DISALLOWED: "disallowed",
+});
+
+export const WitnessLifecycle = Object.freeze({
+  ACTIVE: "active",
+  DORMANT: "dormant",
+  ARCHIVED: "archived",
+});
+
+// --- Utility: ID + timestamp ---
+
+function defaultId() {
+  // Ephemeral civic ID; you can swap this for a stronger generator later.
+  return `witness_${crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)}`;
+}
+
+function defaultCreatedAt() {
+  return new Date().toISOString();
+}
+
+// --- Validation helpers ---
+
+function assertEnum(value, enumObj, fieldName) {
+  const values = Object.values(enumObj);
+  if (!values.includes(value)) {
+    throw new Error(
+      `[Witness] Invalid value for ${fieldName}: "${value}". Expected one of: ${values.join(", ")}`
+    );
+  }
+}
+
+function assertString(value, fieldName) {
+  if (typeof value !== "string") {
+    throw new Error(`[Witness] Field "${fieldName}" must be a string, got: ${typeof value}`);
+  }
+}
+
+function assertObject(value, fieldName) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`[Witness] Field "${fieldName}" must be a plain object`);
+  }
+}
+
+// --- Canonical Witness class ---
+
+export class Witness {
+  /**
+   * Canonical Witness constructor.
+   *
+   * Fields (canonical schema):
+   * - id: ephemeral civic ID (string)
+   * - createdAt: ISO timestamp (string)
+   * - kind: always "witness"
+   * - scope: one of WitnessScope
+   * - visibility: one of WitnessVisibility
+   * - emission: one of WitnessEmission
+   * - retention: one of WitnessRetention
+   * - integrity: one of WitnessIntegrity
+   * - metadata: arbitrary module-defined object
+   * - processing: one of WitnessProcessing
+   * - lifecycle: one of WitnessLifecycle
+   */
+  constructor({
+    id = defaultId(),
+    createdAt = defaultCreatedAt(),
+    scope = WitnessScope.LOCAL,
+    visibility = WitnessVisibility.PRIVATE,
+    emission = WitnessEmission.HASHES,
+    retention = WitnessRetention.SHORT,
+    integrity = WitnessIntegrity.NONE,
+    metadata = {},
+    processing = WitnessProcessing.ALLOWED,
+    lifecycle = WitnessLifecycle.ACTIVE,
+  } = {}) {
+    // Fixed kind
+    this.kind = "witness";
+
+    // Core fields
+    this.id = id;
+    this.createdAt = createdAt;
+    this.scope = scope;
+    this.visibility = visibility;
+    this.emission = emission;
+    this.retention = retention;
+    this.integrity = integrity;
+    this.metadata = metadata;
+    this.processing = processing;
+    this.lifecycle = lifecycle;
+
+    // Validate on construction
+    this._validate();
+  }
+
+  // --- Internal validation (physics enforcement) ---
+
+  _validate() {
+    assertString(this.id, "id");
+    assertString(this.createdAt, "createdAt");
+
+    if (this.kind !== "witness") {
+      throw new Error(`[Witness] kind must always be "witness", got: "${this.kind}"`);
+    }
+
+    assertEnum(this.scope, WitnessScope, "scope");
+    assertEnum(this.visibility, WitnessVisibility, "visibility");
+    assertEnum(this.emission, WitnessEmission, "emission");
+    assertEnum(this.retention, WitnessRetention, "retention");
+    assertEnum(this.integrity, WitnessIntegrity, "integrity");
+    assertEnum(this.processing, WitnessProcessing, "processing");
+    assertEnum(this.lifecycle, WitnessLifecycle, "lifecycle");
+
+    assertObject(this.metadata, "metadata");
+  }
+
+  // --- Lifecycle transitions (still zero verbs) ---
+
+  setLifecycle(nextLifecycle) {
+    assertEnum(nextLifecycle, WitnessLifecycle, "lifecycle");
+    this.lifecycle = nextLifecycle;
+    return this;
+  }
+
+  setMetadata(metadata) {
+    assertObject(metadata, "metadata");
+    this.metadata = metadata;
+    return this;
+  }
+
+  // --- Serialization helpers ---
+
+  toJSON() {
+    return {
+      id: this.id,
+      createdAt: this.createdAt,
+      kind: this.kind,
+      scope: this.scope,
+      visibility: this.visibility,
+      emission: this.emission,
+      retention: this.retention,
+      integrity: this.integrity,
+      metadata: this.metadata,
+      processing: this.processing,
+      lifecycle: this.lifecycle,
+    };
+  }
+
+  static fromJSON(json) {
+    if (!json || typeof json !== "object") {
+      throw new Error("[Witness] fromJSON expects a plain object");
+    }
+    return new Witness(json);
+  }
+}
+
+// --- Canonical presets (spectrum) ---
+
+export const WitnessPresets = Object.freeze({
+  // Restrictive Witness
+  RESTRICTIVE: () =>
+    new Witness({
+      scope: WitnessScope.LOCAL,
+      visibility: WitnessVisibility.PRIVATE,
+      emission: WitnessEmission.HASHES,
+      retention: WitnessRetention.SHORT,
+      integrity: WitnessIntegrity.LOCAL,
+      processing: WitnessProcessing.ALLOWED,
+      lifecycle: WitnessLifecycle.ACTIVE,
+    }),
+
+  // Liberal-Restrictive Witness
+  LIBERAL_RESTRICTIVE: () =>
+    new Witness({
+      scope: WitnessScope.NATIONAL,
+      visibility: WitnessVisibility.SHARED,
+      emission: WitnessEmission.SUMMARIES,
+      retention: WitnessRetention.LONG,
+      integrity: WitnessIntegrity.NATIONAL,
+      processing: WitnessProcessing.ALLOWED,
+      lifecycle: WitnessLifecycle.ACTIVE,
+    }),
+
+  // Open Witness
+  OPEN: () =>
+    new Witness({
+      scope: WitnessScope.GLOBAL,
+      visibility: WitnessVisibility.PUBLIC,
+      emission: WitnessEmission.RAW,
+      retention: WitnessRetention.INDEFINITE,
+      integrity: WitnessIntegrity.MULTI_ANCHOR,
+      processing: WitnessProcessing.ALLOWED,
+      lifecycle: WitnessLifecycle.ACTIVE,
+    }),
+});
+
+// witness-engine.js
+// Deterministic, preset-aware Witness Engine for the WCO Substrate (physics layer only)
+
+export class WitnessEngine {
+  /**
+   * @param {Object} options
+   * @param {Object} options.presets - Witness presets (restrictive, open, etc.)
+   * @param {Object} deps
+   * @param {Object} [deps.schemaValidator] - Optional schema validator with validate(type, obj)
+   */
+  constructor(options = {}, deps = {}) {
+    this.presets = options.presets || {};
+    this.schemaValidator = deps.schemaValidator || null;
+  }
+
+  /**
+   * Turn a physics-surface preset into a canonical Witness object
+   * that satisfies the substrate-level Witness schema.
+   *
+   * Presets are intentionally minimal; this function fills in all
+   * required canonical fields.
+   *
+   * @param {Object} preset
+   * @param {string} [presetName]
+   * @returns {Object} canonical Witness
+   */
+  canonicalizePreset(preset, presetName = null) {
+    const now = Date.now();
+
+    return {
+      // --- preset-driven physics surface ---
+      kind: preset.kind,
+      scope: preset.scope,
+      visibility: preset.visibility,
+      emission: preset.emission,
+      retention: preset.retention,
+      integrity: preset.integrity,
+      protocol: preset.protocol,
+      requiredCapabilities: preset.requiredCapabilities || [],
+
+      // --- canonical substrate-level fields ---
+      id: (typeof crypto !== "undefined" && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : `witness-${now}-${Math.random().toString(16).slice(2)}`,
+
+      createdAt: now,
+
+      lifecycle: {
+        state: "active",
+        createdAt: now,
+        updatedAt: now
+      },
+
+      processing: {
+        version: 1,
+        lastProcessed: null
+      },
+
+      metadata: {
+        engine: "WitnessEngine",
+        presetName
+      }
+    };
+  }
+
+  /**
+   * Create a canonical Witness from a named preset.
+   *
+   * @param {string} presetName
+   * @returns {Object} canonical Witness
+   */
+  createFromPreset(presetName) {
+    const preset = this.presets[presetName];
+    if (!preset) {
+      throw new Error(`WitnessEngine: unknown preset "${presetName}"`);
+    }
+
+    const witness = this.canonicalizePreset(preset, presetName);
+    this._validateCanonicalWitness(witness);
+    return witness;
+  }
+
+  /**
+   * Create a canonical Witness from an ad-hoc partial object
+   * (e.g., module-provided config), still going through the
+   * same canonicalization path.
+   *
+   * @param {Object} partial
+   * @returns {Object} canonical Witness
+   */
+  createFromPartial(partial) {
+    const witness = this.canonicalizePreset(partial, partial.presetName || null);
+    this._validateCanonicalWitness(witness);
+    return witness;
+  }
+
+  /**
+   * Internal: validate against schema if a validator is provided.
+   *
+   * @param {Object} witness
+   * @private
+   */
+  _validateCanonicalWitness(witness) {
+    if (!this.schemaValidator) return;
+
+    // Expect a schemaValidator with signature: validate("Witness", obj)
+    const ok = this.schemaValidator.validate("Witness", witness);
+    if (!ok) {
+      const err = this.schemaValidator.errors && this.schemaValidator.errors[0];
+      const msg = err
+        ? `${err.instancePath || ""} ${err.message || "invalid Witness"}`
+        : "invalid Witness";
+      throw new Error(`WitnessEngine: schema validation failed: ${msg}`);
+    }
+  }
+}
+
+// witness-presets.js
+// Minimal physics-surface witness presets for the WCO Substrate
+
+export default {
+  "$id": "https://wco.dev/presets/witness-presets.json",
+  "version": "0.1",
+
+  "presets": {
+    "restrictive": {
+      kind: "witness",
+      scope: "local",
+      visibility: "private",
+      emission: "hashes",
+      retention: "short",
+      integrity: "local",
+
+      // Witnesses do not have verbs — they observe
+      protocol: [],
+
+      requiredCapabilities: []
+    },
+
+    "open": {
+      kind: "witness",
+      scope: "global",
+      visibility: "shared",
+      emission: "full",
+      retention: "long",
+      integrity: "distributed",
+
+      protocol: ["observe", "attest"],
+      requiredCapabilities: ["canObserve", "canAttest"]
+    }
+  }
+};
+

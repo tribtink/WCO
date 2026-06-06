@@ -1,0 +1,40 @@
+# What is Civic Substrate?
+
+Civic Substrate is an experimental platform for building civic, social, organizational, and collective intelligence systems on a shared foundation.
+
+Rather than creating isolated applications, Civic Substrate provides a common runtime where modules, nodes, witnesses, services, and governance structures can interact through a consistent architecture.
+
+The project is designed around a simple idea:
+
+Many institutions, communities, organizations, and public systems repeatedly solve similar coordination problems, yet most digital infrastructure remains fragmented and application-specific.
+
+Civic Substrate explores whether a shared civic operating environment can provide reusable foundations for participation, representation, observation, coordination, governance, knowledge management, and collective decision-making.
+
+The platform is intentionally modular.
+
+Organizations can develop their own modules, define their own structures, and connect existing systems into a common environment without requiring a single centralized model.
+
+Potential applications include:
+
+• civic organizations
+• nonprofit networks
+• community governance
+• research environments
+• public consultation systems
+• collective intelligence projects
+• educational initiatives
+• coordination platforms
+• institutional experimentation
+• international collaboration systems
+
+The architecture is designed to support both small local deployments and large-scale interconnected ecosystems.
+
+Current development focuses on foundational infrastructure, including nodes, witnesses, plugin systems, runtime services, persistence layers, and canonical data structures.
+
+Future research directions include semantic operating systems, collective cognition environments, adaptive governance systems, shared knowledge spaces, artificial life experimentation, cultural intelligence modeling, and other forms of large-scale social computation.
+
+Civic Substrate is not intended to prescribe a particular political ideology, governance model, or institutional structure.
+
+It is infrastructure for experimentation, development, and exploration.
+
+The long-term objective is to create an extensible foundation upon which many different civic, organizational, and collective systems can be built, studied, and evolved.
