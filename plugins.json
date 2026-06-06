@@ -1,0 +1,6 @@
+{
+  "modules": [
+    "modules/plugin-module-blank-template.js",
+    "modules/test/test.js"
+  ]
+}

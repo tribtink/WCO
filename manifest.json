@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "WCO Substrate",
+  "version": "0.2",
+
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+
+  "action": {
+    "default_title": "WCO Substrate"
+  },
+
+  "permissions": [
+    "tabs",
+    "storage",
+    "scripting"
+  ],
+
+  "host_permissions": [
+    "<all_urls>"
+  ],
+
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "substrate.html",
+        "substrate-runtime.js",
+        "plugins.json",
+        "storage-helpers.js",
+        "substrate-glue.js",
+        "registry.js",
+        "modules/*.js"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

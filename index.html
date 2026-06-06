@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>WCO Substrate Demo</title>
+
+  <style>
+    body {
+      background: #0f0f0f;
+      color: #e0e0e0;
+      font-family: sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h1, h2 {
+      margin-top: 0;
+    }
+
+    #top-links {
+      margin-bottom: 20px;
+      padding: 10px;
+      background: #1a1a1a;
+      border-radius: 6px;
+    }
+
+    #substrate-ui {
+      display: flex;
+      gap: 20px;
+      margin-top: 20px;
+    }
+
+    .panel {
+      flex: 1;
+      background: #1a1a1a;
+      padding: 10px;
+      border-radius: 6px;
+      min-height: 200px;
+      overflow-y: auto;
+    }
+
+    .panel h3 {
+      margin-top: 0;
+      border-bottom: 1px solid #333;
+      padding-bottom: 5px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>WCO Substrate Demo</h1>
+
+  <div id="top-links">
+    <h2>Documentation</h2>
+    <ul>
+      <li><a href="wco.html" style="color:#9cf">World Citizens Org Overview</a></li>
+      <li><a href="civic-substrate.html" style="color:#9cf">Civic Substrate Overview</a></li>
+    </ul>
+  </div>
+
+  <h2>Live Substrate Panels</h2>
+
+  <div id="substrate-ui">
+    <div class="panel" id="nodes">
+      <h3>Nodes</h3>
+      <div id="node-list">Loading…</div>
+    </div>
+
+    <div class="panel" id="witness">
+      <h3>Witness Timeline</h3>
+      <div id="witness-list">Loading…</div>
+    </div>
+
+    <div class="panel" id="modules">
+      <h3>Modules</h3>
+      <div id="module-list">Loading…</div>
+    </div>
+  </div>
+
+  <script type="module">
+    import runtime from "./substrate-runtime.js";
+
+    async function start() {
+      await runtime.init();
+      const physics = runtime.getPhysics();
+      const ctx = runtime.getCtx();
+
+      // Node viewer
+      setInterval(() => {
+        const nodes = physics.node?.getAll?.() || [];
+        document.getElementById("node-list").innerHTML =
+          nodes.length
+            ? nodes.map(n => `<div>${n.id}: ${JSON.stringify(n)}</div>`).join("")
+            : "<i>No nodes yet</i>";
+      }, 500);
+
+      // Witness timeline
+      setInterval(() => {
+        const events = physics.witness?.getEvents?.() || [];
+        document.getElementById("witness-list").innerHTML =
+          events.length
+            ? events.map(e => `<div>[${e.ts}] ${e.type}</div>`).join("")
+            : "<i>No events yet</i>";
+      }, 500);
+
+      // Module list
+      const moduleNames = Object.keys(ctx.physics || {});
+      document.getElementById("module-list").innerHTML =
+        moduleNames.length
+          ? moduleNames.map(m => `<div>${m}</div>`).join("")
+          : "<i>No modules loaded</i>";
+    }
+
+    start();
+  </script>
+
+</body>
+</html>

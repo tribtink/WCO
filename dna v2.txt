@@ -1,0 +1,88 @@
+core
+actors
+processes
+governance
+artifacts
+wco
+
+
+topic
+proposal
+event
+decision
+signal
+action
+artifact
+mandate
+process_step
+coordination_request
+evaluation
+dispute
+resolution
+
+
+participation
+transparency
+neutrality
+safety
+accountability
+traceability
+legibility
+coherence
+fairness
+inclusivity
+urgency
+impact
+scope
+
+
+
+
+{
+  "dnaVersion": "2.0.0",
+
+  "axes": {
+    "domain": [
+      "core",
+      "actors",
+      "processes",
+      "governance",
+      "artifacts",
+      "wco"
+    ],
+
+    "objectType": [
+      "topic",
+      "proposal",
+      "event",
+      "decision",
+      "signal",
+      "action",
+      "artifact",
+      "mandate",
+      "process_step",
+      "coordination_request",
+      "evaluation",
+      "dispute",
+      "resolution"
+    ],
+
+    "civic": [
+      "participation",
+      "transparency",
+      "neutrality",
+      "safety",
+      "accountability",
+      "traceability",
+      "legibility",
+      "coherence",
+      "fairness",
+      "inclusivity",
+      "urgency",
+      "impact",
+      "scope"
+    ],
+
+    "external": {}
+  }
+}
