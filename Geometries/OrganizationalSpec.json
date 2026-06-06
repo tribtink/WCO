@@ -1,0 +1,96 @@
+{
+  "id": "organizational",
+  "variables": {
+    "T": {
+      "label": "Trust",
+      "initial": 0.6
+    },
+    "A": {
+      "label": "Alignment",
+      "initial": 0.55
+    },
+    "E": {
+      "label": "EpistemicQuality",
+      "initial": 0.6
+    },
+    "I": {
+      "label": "IncentiveCoherence",
+      "initial": 0.5
+    },
+    "S": {
+      "label": "StressLoad",
+      "initial": 0.4
+    },
+    "H": {
+      "label": "HierarchyConcentration",
+      "initial": 0.5
+    },
+    "kappa": {
+      "label": "Context",
+      "initial": 0.4
+    }
+  },
+
+  "dynamics": [
+    {
+      "id": "trust_update",
+      "order": 1,
+      "inputs": ["T", "E", "A", "S"],
+      "output": "T",
+      "rule": "0.4*E + 0.35*A - 0.45*S - 0.2*(T-0.5)"
+    },
+    {
+      "id": "alignment_update",
+      "order": 2,
+      "inputs": ["A", "I", "T", "S"],
+      "output": "A",
+      "rule": "0.3*T + 0.4*I - 0.35*S - 0.15*(A-0.5)"
+    },
+    {
+      "id": "epistemic_update",
+      "order": 3,
+      "inputs": ["E", "T", "S"],
+      "output": "E",
+      "rule": "0.35*T - 0.4*S + 0.1*(1-E)"
+    },
+    {
+      "id": "incentive_update",
+      "order": 4,
+      "inputs": ["I", "H", "T"],
+      "output": "I",
+      "rule": "0.3*T - 0.25*H + 0.1*(1-I)"
+    },
+    {
+      "id": "stress_update",
+      "order": 5,
+      "inputs": ["S", "E", "A"],
+      "output": "S",
+      "rule": "0.5*(1-E) + 0.4*(1-A) - 0.2*S"
+    },
+    {
+      "id": "context_update",
+      "order": 6,
+      "inputs": ["kappa", "T", "A", "S"],
+      "output": "kappa",
+      "rule": "0.3*T + 0.25*A - 0.4*S - 0.1*(kappa-0.5)"
+    }
+  ],
+
+  "regions": {
+    "high_performance": "T>0.7 && A>0.7 && E>0.65 && I>0.6 && S<0.35",
+    "friendly_drift": "T>0.6 && A<0.55 && E>0.5 && S<0.5",
+    "brittle_efficiency": "A>0.7 && T<0.45 && H>0.6 && S>0.5",
+    "dysfunction": "T<0.4 && A<0.45 && E<0.45 && I<0.45 && S>0.6",
+    "epistemic_collapse": "E<0.35 && S>0.55",
+    "incentive_fracture": "I<0.4 && A<0.5 && S>0.5",
+    "containment_failure": "T<0.35 && S>0.65",
+    "power_vacuum": "H<0.3 && A<0.45 && T<0.45"
+  },
+
+  "transforms": {
+    "coordination_health": "0.3*T + 0.3*A + 0.2*E + 0.2*I - 0.4*S",
+    "burnout_risk": "0.6*S + 0.3*(1-T) + 0.2*(1-A)",
+    "alignment_pressure": "0.5*(1-A) + 0.3*(1-I) + 0.2*S",
+    "epistemic_risk": "0.5*(1-E) + 0.3*S + 0.2*(1-T)"
+  }
+}
