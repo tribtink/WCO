@@ -1,0 +1,486 @@
+1. Structural axis
+Components: Ontology, topology, capability
+
+Think of this as: what exists, how it’s wired, and what it can do.
+
+Ontology 
+𝑂
+:  
+A discrete or mixed space describing the types of entities and relations present.
+
+Example: 
+𝑂
+∈
+{
+individuals, firms, states, protocols, AIs, norms, 
+…
+}
+
+Formally: a typed graph schema or category of object/arrow types.
+
+Topology 
+𝑇
+:  
+A graph over instantiated entities: who can affect/observe whom.
+
+Represent as a directed multigraph 
+𝐺
+=
+(
+𝑉
+,
+𝐸
+)
+ with labeled edges (influence, information, enforcement, etc.).
+
+Topological features (degree distribution, clustering, centrality) are functions on this axis.
+
+Capability 
+𝐶
+:  
+A mapping from agents to feasible action sets and power.
+
+For each agent 
+𝑎
+, capability profile 
+𝐶
+(
+𝑎
+)
+ includes:
+
+action set 
+𝐴
+𝑎
+
+resource vector 
+𝑅
+𝑎
+
+power score 
+𝑃
+𝑎
+ (e.g., expected state‑space volume they can move).
+
+Structural axis 
+𝑆
+:
+
+𝑆
+=
+(
+𝑂
+,
+𝑇
+,
+𝐶
+)
+A point on 
+𝑆
+ is a particular “wiring and capacity” configuration of the system.
+
+2. Runtime axis
+Components: State, dynamics, outcome
+
+This is the “physics” of the system at a given moment and how it evolves.
+
+State 
+𝑋
+:  
+A high‑dimensional vector capturing:
+
+resource distributions
+
+trust levels
+
+institutional statuses
+
+active conflicts
+
+current policies, etc.
+Formally: 
+𝑋
+∈
+𝑋
+, where 
+𝑋
+ is your full state space.
+
+Dynamics 
+𝐹
+:  
+The transition function or process:
+
+𝑋
+𝑡
++
+1
+=
+𝐹
+(
+𝑋
+𝑡
+,
+𝑆
+𝑡
+,
+𝑈
+𝑡
+,
+𝜉
+𝑡
+)
+𝑆
+𝑡
+: structural configuration at time 
+𝑡
+
+𝑈
+𝑡
+: joint actions of agents
+
+𝜉
+𝑡
+: exogenous shocks/noise
+
+Outcome 
+𝑌
+:  
+Projections of state onto observables or objective functions.
+
+Example: welfare, casualties, inequality, stability, growth, legitimacy, etc.
+
+Formally: 
+𝑌
+=
+𝐺
+(
+𝑋
+)
+ for some observable map 
+𝐺
+.
+
+Runtime axis 
+𝑅
+:
+
+𝑅
+=
+(
+𝑋
+,
+𝐹
+,
+𝑌
+)
+A point on 
+𝑅
+ is “where the system is and how it’s currently moving.”
+
+3. Scope axis
+Range: Individual ↔ Civilization
+
+This is a scale parameter, not just “size.”
+
+Let scope 
+𝑘
+ index levels:
+
+𝑘
+∈
+{
+0
+,
+1
+,
+2
+,
+3
+,
+4
+}
+Example mapping:
+
+𝑘
+=
+0
+: individual
+
+𝑘
+=
+1
+: small group / team
+
+𝑘
+=
+2
+: organization / firm / city
+
+𝑘
+=
+3
+: state / region
+
+𝑘
+=
+4
+: civilization / planetary
+
+At each 
+𝑘
+, you can define:
+
+state 
+𝑋
+(
+𝑘
+)
+
+structure 
+𝑆
+(
+𝑘
+)
+
+dynamics 
+𝐹
+(
+𝑘
+)
+
+Scope axis 
+𝜎
+:
+
+𝜎
+∈
+[
+0
+,
+4
+]
+(or a discrete set if you prefer)
+Movement along 
+𝜎
+ is zooming in/out; invariants are what persist across 
+𝜎
+.
+
+4. Context axis
+Range: Cooperative ↔ Adversarial
+
+This is where peace/war lives as regions, not categories.
+
+Define a context parameter 
+𝜅
+ capturing the strategic relationship among agents.
+
+Let:
+
+𝜅
+∈
+[
+−
+1
+,
+1
+]
+Interpretation:
+
+𝜅
+≈
+1
+: strongly cooperative (aligned payoffs, high trust, low sabotage)
+
+𝜅
+≈
+0
+: mixed‑motive / competitive (markets, politics, negotiation)
+
+𝜅
+≈
+−
+1
+: strongly adversarial (war, active subversion, zero‑sum framing)
+
+You can define 
+𝜅
+ more formally via payoff correlations:
+
+𝜅
+=
+𝐸
+[
+corr
+(
+𝑢
+𝑖
+,
+𝑢
+𝑗
+)
+]
+over relevant agent pairs 
+𝑖
+,
+𝑗
+, where 
+𝑢
+𝑖
+ is agent 
+𝑖
+’s utility.
+
+Peace region:  
+High 
+𝜅
+, high conflict containment, low direct violence.
+
+War region:  
+Low/negative 
+𝜅
+, breakdown of containment, high direct coercion.
+
+Context axis 
+𝜅
+:
+
+𝜅
+∈
+[
+−
+1
+,
+1
+]
+Movement along 
+𝜅
+ is shifting the game from aligned to hostile.
+
+5. Temporal axis
+Range: Immediate ↔ Civilizational
+
+This is about planning horizon and memory depth.
+
+Define a time‑scale parameter 
+𝜏
+:
+
+𝜏
+∈
+[
+𝜏
+min
+⁡
+,
+𝜏
+max
+⁡
+]
+𝜏
+min
+⁡
+: seconds/minutes/hours (tactical)
+
+𝜏
+max
+⁡
+: decades/centuries (civilizational)
+
+For each 
+𝜏
+, you can define:
+
+discount factor 
+𝛾
+(
+𝜏
+)
+ for objectives
+
+which variables in 
+𝑋
+ are considered “slow” vs “fast”
+
+which dynamics 
+𝐹
+ dominate (e.g., military vs demographic vs cultural)
+
+Temporal axis 
+𝜏
+:
+
+𝜏
+ indexes the characteristic time scale of interest
+Movement along 
+𝜏
+ is shifting from short‑term to long‑term dynamics.
+
+6. Putting it together: a point in your geometry
+A full “system snapshot” in your substrate can be represented as:
+
+Π
+=
+(
+𝑆
+,
+𝑅
+,
+𝜎
+,
+𝜅
+,
+𝜏
+)
+where:
+
+𝑆
+=
+(
+𝑂
+,
+𝑇
+,
+𝐶
+)
+
+𝑅
+=
+(
+𝑋
+,
+𝐹
+,
+𝑌
+)
+
+𝜎
+: scope level
+
+𝜅
+: cooperative–adversarial context
+
+𝜏
+: temporal scale
+
+Peace vs war are not different 
+Π
+’s in kind; they are different regions in this space, primarily distinguished by:
+
+𝜅
+ (context)
+
+specific patterns in 
+𝑋
+ (e.g., mobilization, casualties, institutional breakdown)
+
+changes in 
+𝐹
+ (dynamics dominated by coercion vs negotiation)
+
+shifts in 
+𝑇
+ and 
+𝐶
+ (who can do what to whom)

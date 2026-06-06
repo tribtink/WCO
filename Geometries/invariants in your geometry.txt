@@ -1,0 +1,166 @@
+What “invariants” means in your geometry
+In this substrate, invariants are the things that stay structurally true across:
+
+peace ↔ war
+
+cooperation ↔ adversariality
+
+individual ↔ civilization
+
+They’re not constants in the sense of “never changing values”; they’re conserved structures and constraints—the grammar of possible states and transitions.
+
+From your own text:
+
+“War and peace are not different systems.
+They are different regions of the same system’s state–context space.”
+
+The invariants are what make it “the same system.”
+
+1. Ontological invariants
+These are the “always present” primitives—if any of these are missing, you don’t have a coordination system at all.
+
+Agents:  
+There is always at least one locus of decision and action (individuals, groups, institutions, AIs).
+No agents → no coordination, no conflict.
+
+Resources and constraints:  
+Scarcity, limits, or trade‑offs always exist (time, attention, energy, material, bandwidth, legitimacy).
+Without constraints, there is no real choice, hence no strategy.
+
+Information:  
+Signals, observations, messages, or data are always present, even if degraded or manipulated.
+No information → no epistemics, no learning, no deception.
+
+These three—agents, resources, information—are ontological invariants.
+
+2. Structural invariants
+These are properties of how things are wired, regardless of whether the system is in peace or war.
+
+Topology of interaction:  
+There is always some graph: who can affect whom, who can observe whom, who can coordinate with whom.
+Edges can change, but “there is a graph” is invariant.
+
+Role structure:  
+There are always roles (even if informal): initiators, responders, mediators, spoilers, stewards, free‑riders.
+Labels change, but the functional roles recur.
+
+Channels and interfaces:  
+There are always pathways for influence (markets, laws, norms, APIs, protocols, media, violence).
+The specific channel mix changes; the existence of channels does not.
+
+These are structural invariants: the system is always “some graph of roles over channels.”
+
+3. Epistemic invariants
+These are about knowledge and belief—what is always true about how agents know and don’t know.
+
+Partial information:  
+No agent has complete, perfectly accurate knowledge of the full state.
+Uncertainty is invariant; only its degree and distribution vary.
+
+Asymmetry:  
+Some agents know more than others, or know different things.
+This asymmetry is what makes deception, signaling, and intelligence meaningful.
+
+Update dynamics:  
+Beliefs are always being updated (or failing to update) in response to signals.
+Whether via Bayesian reasoning, heuristics, propaganda, or myth, there is always an epistemic process.
+
+These are epistemic invariants: uncertainty, asymmetry, and updating never disappear.
+
+4. Power and agency invariants
+These capture the fact that influence is never flat.
+
+Differential capacity to affect outcomes:  
+Some agents can move more of the state space than others (resources, authority, coercive means, narrative reach).
+Power distribution can shift, but the existence of differential power is invariant.
+
+Agency under constraint:  
+Agents always act under constraints (rules, norms, capabilities, risks), but they still have choice.
+Zero agency → no strategy; zero constraint → no meaningful strategy.
+
+Feedback from action to capacity:  
+Actions change future power (investments, reputations, alliances, deterrence).
+Power is both a state and a function of history—this feedback loop is invariant.
+
+These are power/agency invariants: there is always uneven, history‑dependent capacity to act.
+
+5. Incentive invariants
+These are about why agents move at all.
+
+Objective functions (local):  
+Every agent has some implicit or explicit objective (survival, profit, status, ideology, stability, growth).
+The content varies; the existence of objectives does not.
+
+Externalities:  
+Actions by one agent affect others, often in ways not fully priced or internalized.
+Without externalities, there is no conflict of interest, no commons problems.
+
+Misalignment potential:  
+Local objectives can diverge from system‑level health or global objectives.
+This misalignment potential is invariant; only its severity changes.
+
+These are incentive invariants: agents always optimize something, and those optimizations always interact.
+
+6. Trust and legitimacy invariants
+These govern whether coordination is cheap or expensive.
+
+Reliance on expectations:  
+Coordination always depends on expectations about others’ behavior (promises, norms, reputations, institutions).
+Even in war, strategy assumes some regularity.
+
+Vulnerability to betrayal:  
+Trust always creates exposure; betrayal is always possible.
+If betrayal were impossible, trust wouldn’t be a meaningful variable.
+
+Legitimacy as a meta‑resource:  
+Systems always rely on some story of “rightful” authority or procedure (law, tradition, consent, performance).
+The narrative changes; the need for legitimacy does not.
+
+These are trust/legitimacy invariants: expectation, vulnerability, and justification are always in play.
+
+7. Conflict containment and transformation invariants
+These define how conflict exists without instantly destroying the system.
+
+From your text:
+
+“War is not primarily about weapons. Weapons are one implementation. At a deeper level, war is organized competition between groups pursuing objectives under conditions of limited trust.”
+
+Conflict is ever‑present:  
+Interests are never perfectly aligned; conflict is always latent or active.
+
+Containment mechanisms:  
+There are always mechanisms that shape how conflict expresses (law, norms, markets, rituals, courts, elections, taboos, deterrence, violence).
+The specific mechanisms change; the existence of some containment is invariant—otherwise the system collapses immediately.
+
+Transformability:  
+Conflicts can be transformed (reframed, traded, compensated, institutionalized, sublimated).
+The possibility of transformation is invariant; only its accessibility and cost vary.
+
+These are conflict invariants: conflict is constant; only its form and containment differ.
+
+8. System‑level objective invariants
+Finally, there are invariants at the level of the whole substrate.
+
+Persistence vs. collapse:  
+Every coordination system is implicitly “trying” to persist as a recognizable pattern rather than dissolve.
+If persistence were not a pressure, there would be no system to model.
+
+Throughput of value/information:  
+Systems must maintain some minimum throughput (material, informational, or symbolic) to remain viable.
+The channels change; the need for throughput does not.
+
+Adaptation pressure:  
+Environments change; systems that cannot adapt eventually fail.
+Adaptation pressure is invariant; only the tempo and intensity vary.
+
+These are system‑objective invariants: persistence, throughput, and adaptation are always in the background.
+
+How this plugs back into your geometry
+In your “taxonomy → geometry” move, the invariants are:
+
+the fixed grammar of the state space
+
+the constraints on trajectories through that space
+
+Axes (peace/war, cooperative/adversarial, individual/civilizational, etc.) describe where you are.
+Invariants describe what must always be true no matter where you are.

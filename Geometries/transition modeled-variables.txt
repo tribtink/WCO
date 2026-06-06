@@ -1,0 +1,660 @@
+1. Choose the minimal transition variables
+From everything you’ve already built, the key levers for peace↔war are:
+
+Trust 
+𝑇
+: average cross‑boundary trust (between major blocs/factions)
+
+Containment 
+𝐶
+: strength/effectiveness of conflict‑containing institutions and norms
+
+Epistemic quality 
+𝐸
+: signal‑to‑noise in shared information (truthfulness, reliability)
+
+Power asymmetry 
+𝑃
+: perceived imbalance in coercive capacity
+
+Grievance/pressure 
+𝐺
+: accumulated unresolved conflicts and perceived injustices
+
+Context 
+𝜅
+: your cooperative↔adversarial axis
+
+We’ll treat these as coarse‑grained order parameters—summaries of a huge underlying state.
+
+2. Write the transition system at a high level
+Think in discrete time for now:
+
+𝑇
+𝑡
++
+1
+=
+𝑓
+𝑇
+(
+𝑇
+𝑡
+,
+𝐸
+𝑡
+,
+𝐶
+𝑡
+,
+𝐺
+𝑡
+)
+𝐶
+𝑡
++
+1
+=
+𝑓
+𝐶
+(
+𝐶
+𝑡
+,
+𝑇
+𝑡
+,
+𝑃
+𝑡
+,
+𝐺
+𝑡
+)
+𝐸
+𝑡
++
+1
+=
+𝑓
+𝐸
+(
+𝐸
+𝑡
+,
+𝐶
+𝑡
+,
+propaganda
+𝑡
+,
+shocks
+𝑡
+)
+𝐺
+𝑡
++
+1
+=
+𝑓
+𝐺
+(
+𝐺
+𝑡
+,
+events
+𝑡
+,
+𝐶
+𝑡
+,
+𝑇
+𝑡
+)
+𝜅
+𝑡
++
+1
+=
+𝑓
+𝜅
+(
+𝜅
+𝑡
+,
+𝑇
+𝑡
+,
+𝐶
+𝑡
+,
+𝐺
+𝑡
+,
+𝑃
+𝑡
+)
+You don’t need exact functional forms yet—what matters is signs and thresholds.
+
+3. Encode the qualitative directions (signs)
+We want the functions to reflect intuitions like:
+
+Higher E (better epistemics) → higher T
+
+Higher T and C → lower G (conflicts get resolved)
+
+Higher G and P (with low C) → more adversarial 
+𝜅
+
+Lower T and E → weaker C over time (institutions hollow out)
+
+So, for example:
+
+Trust update:
+
+𝑇
+𝑡
++
+1
+=
+𝑇
+𝑡
++
+𝛼
+𝐸
+𝐸
+𝑡
++
+𝛼
+𝐶
+𝐶
+𝑡
+−
+𝛼
+𝐺
+𝐺
+𝑡
++
+𝜖
+𝑇
+with 
+𝛼
+𝐸
+,
+𝛼
+𝐶
+,
+𝛼
+𝐺
+>
+0
+.
+
+Containment update:
+
+𝐶
+𝑡
++
+1
+=
+𝐶
+𝑡
++
+𝛽
+𝑇
+𝑇
+𝑡
+−
+𝛽
+𝑃
+𝑃
+𝑡
+−
+𝛽
+𝐺
+𝐺
+𝑡
++
+𝜖
+𝐶
+Epistemic quality update:
+
+𝐸
+𝑡
++
+1
+=
+𝐸
+𝑡
++
+𝛾
+𝐶
+𝐶
+𝑡
+−
+𝛾
+prop
+propaganda
+𝑡
++
+𝜖
+𝐸
+Grievance update:
+
+𝐺
+𝑡
++
+1
+=
+𝐺
+𝑡
++
+𝛿
+events
+harm
+𝑡
+−
+𝛿
+𝐶
+𝐶
+𝑡
+−
+𝛿
+𝑇
+𝑇
+𝑡
++
+𝜖
+𝐺
+Context update:
+
+𝜅
+𝑡
++
+1
+=
+𝜅
+𝑡
++
+𝜂
+𝑇
+𝑇
+𝑡
++
+𝜂
+𝐶
+𝐶
+𝑡
+−
+𝜂
+𝐺
+𝐺
+𝑡
+−
+𝜂
+𝑃
+𝑃
+𝑡
++
+𝜖
+𝜅
+All 
+𝜖
+ terms are noise/shocks.
+
+You’ve just turned “transition dynamics” into a coupled system.
+
+4. Define peace and war as attractor regions
+Now specify regions in this space:
+
+Peace‑like region 
+𝑃
+:
+
+𝑃
+=
+{
+(
+𝑇
+,
+𝐶
+,
+𝐸
+,
+𝐺
+,
+𝜅
+)
+∣
+𝑇
+ high
+,
+𝐶
+ high
+,
+𝐸
+ high
+,
+𝐺
+ low
+,
+𝜅
+≈
+1
+}
+War‑like region 
+𝑊
+:
+
+𝑊
+=
+{
+(
+𝑇
+,
+𝐶
+,
+𝐸
+,
+𝐺
+,
+𝜅
+)
+∣
+𝑇
+ low
+,
+𝐶
+ low
+,
+𝐸
+ low
+,
+𝐺
+ high
+,
+𝜅
+≈
+−
+1
+}
+A transition is a trajectory that crosses from 
+𝑃
+ to 
+𝑊
+ (or back).
+
+The interesting part is: what patterns in the update equations make one region an attractor?
+
+5. Model peace → war as a cascade
+A typical peace→war trajectory in your model:
+
+Epistemic erosion:
+
+Increase in propaganda/shocks → 
+𝐸
+𝑡
+ drops
+
+Lower 
+𝐸
+𝑡
+ → misperceptions, fear, miscalculation
+
+Trust decay:
+
+Lower 
+𝐸
+𝑡
+ and some negative events → 
+𝑇
+𝑡
+ drops
+
+As 
+𝑇
+𝑡
+ falls, 
+𝛽
+𝑇
+𝑇
+𝑡
+ term weakens support for 
+𝐶
+𝑡
+
+Containment weakening:
+
+Lower 
+𝑇
+𝑡
+ and higher 
+𝐺
+𝑡
+ → 
+𝐶
+𝑡
+ erodes
+
+Institutions lose legitimacy and enforcement capacity
+
+Grievance accumulation:
+
+With weak 
+𝐶
+𝑡
+, harms aren’t resolved → 
+𝐺
+𝑡
+ rises
+
+Rising 
+𝐺
+𝑡
+ feeds back into lower 
+𝑇
+𝑡
+ and 
+𝐶
+𝑡
+
+Context shift:
+
+High 
+𝐺
+𝑡
+, low 
+𝑇
+𝑡
+, low 
+𝐶
+𝑡
+, plus any power asymmetry 
+𝑃
+𝑡
+ → 
+𝜅
+𝑡
+ moves negative
+
+System crosses a threshold where violent options become locally rational
+
+You can formalize the threshold as:
+
+War onset when 
+𝜅
+𝑡
+<
+𝜅
+crit
+ and 
+𝐶
+𝑡
+<
+𝐶
+crit
+6. Model war → peace as a different, harder trajectory
+Crucially, the reverse is not symmetric—you’ve got hysteresis.
+
+To move from 
+𝑊
+ back to 
+𝑃
+, you need:
+
+Ceasefire / hard containment spike:
+
+Exogenous boost to 
+𝐶
+𝑡
+ (external guarantor, overwhelming force, or mutual exhaustion)
+
+Security guarantees / power rebalancing:
+
+Adjust 
+𝑃
+𝑡
+ so that deterrence works without constant violence
+
+Epistemic repair:
+
+Invest in 
+𝐸
+𝑡
+: monitoring, verification, shared facts
+
+Trust rebuilding:
+
+Slow, path‑dependent increase in 
+𝑇
+𝑡
+ via reliable behavior and fulfilled commitments
+
+Grievance transformation:
+
+Mechanisms (truth commissions, reparations, federalism, autonomy) that reduce 
+𝐺
+𝑡
+ without reigniting conflict
+
+Formally, you can encode different coefficients in war→peace mode:
+
+𝑇
+𝑡
++
+1
+=
+𝑇
+𝑡
++
+𝛼
+𝐸
+′
+𝐸
+𝑡
++
+𝛼
+𝐶
+′
+𝐶
+𝑡
+−
+𝛼
+𝐺
+′
+𝐺
+𝑡
+𝐶
+𝑡
++
+1
+=
+𝐶
+𝑡
++
+𝛽
+𝑇
+′
+𝑇
+𝑡
+−
+𝛽
+𝑃
+′
+𝑃
+𝑡
+−
+𝛽
+𝐺
+′
+𝐺
+𝑡
+with 
+𝛼
+𝐸
+′
+,
+𝛼
+𝐶
+′
+,
+𝛽
+𝑇
+′
+ much smaller than their peace‑time analogues—trust and containment rebuild slowly.
+
+That asymmetry is the formal expression of “easy to fall into war, hard to climb out.”
+
+7. Where your geometry comes back in
+All of this sits inside your full point:
+
+Π
+𝑡
+=
+(
+𝑆
+𝑡
+,
+𝑅
+𝑡
+,
+𝜎
+,
+𝜅
+𝑡
+,
+𝜏
+)
+The transition dynamics we just wrote are a coarse‑grained part of 
+𝐹
+ in your runtime axis.
+
+𝜎
+ (scope) tells you whether you’re modeling factions in a state, states in a system, or blocs in a civilization.
+
+𝜏
+ (time scale) changes the step size and which processes dominate (propaganda vs demographics vs tech shifts).
+
+You now have:
+
+a set of order parameters 
+(
+𝑇
+,
+𝐶
+,
+𝐸
+,
+𝐺
+,
+𝑃
+,
+𝜅
+)
+
+update equations with signs and thresholds
+
+regions 
+𝑃
+,
+𝑊
+ that define peace and war as attractors

@@ -1,0 +1,304 @@
+Let’s treat this like a generative grammar: Tier‑0 are your primitives; Tier‑1 are the first composite structures you must get if the ontology is real.
+
+Your Tier‑0 (from earlier):
+
+Reality
+
+Information
+
+Epistemics
+
+Power
+
+Agency
+
+Incentives
+
+Trust
+
+Conflict containment
+
+Transformation
+
+Objective function
+
+I’ll show how Tier‑1 falls out mechanically from combinations of these.
+
+1. Agents, environments, and games
+Tier‑0 used: Reality + Agency + Objective function + Incentives + Information
+
+Agent:  
+A locus of choice with an objective function over reality.
+
+Agent
+=
+(
+Agency
+,
+Objective function
+,
+Information
+)
+Environment:  
+The part of reality not directly controlled by the agent, but affecting outcomes.
+
+Environment
+⊂
+Reality
+Game (interaction structure):  
+Multiple agents, each with objectives and information, coupled through a shared environment.
+
+Game
+=
+(
+{
+Agents
+}
+,
+Reality
+,
+Incentive structure
+)
+Tier‑1 concepts:  
+Agents, environments, games are the minimal composites you get once you have agency, objectives, and information in a shared reality.
+
+2. Institutions and protocols
+Tier‑0 used: Power + Incentives + Conflict containment + Trust + Transformation
+
+Institution:  
+A stable pattern of rules and roles that shapes incentives and power to contain conflict and enable cooperation.
+
+Institution
+=
+(
+Rules
+,
+Roles
+,
+Enforcement
+,
+Legitimacy
+)
+where:
+
+Rules: transformation constraints on actions and states
+
+Enforcement: application of power to uphold rules
+
+Legitimacy: trust that the rules are “rightful” or acceptable
+
+Protocol:  
+A narrower, more technical institution—structured interaction steps that transform states under agreed rules.
+
+Protocol
+⊂
+Institution
+Tier‑1 concepts:  
+Institutions, protocols, enforcement, legitimacy as structured uses of power + incentives + containment.
+
+3. Markets, hierarchies, and networks
+Tier‑0 used: Power + Incentives + Trust + Information + Conflict containment
+
+These are canonical coordination forms.
+
+Market:  
+Coordination via price signals and voluntary exchange under some containment (property rights, contract law).
+
+Market
+=
+(
+Agents
+,
+Price mechanism
+,
+Property rules
+,
+Trust layer
+)
+Hierarchy:  
+Coordination via authority and command, backed by concentrated power and internal norms.
+
+Hierarchy
+=
+(
+Power gradient
+,
+Command channels
+,
+Obedience norms
+)
+Network:  
+Coordination via distributed ties, reputation, and shared norms.
+
+Network
+=
+(
+Agents
+,
+Relational graph
+,
+Reputation
+,
+Shared narratives
+)
+Tier‑1 concepts:  
+Markets, hierarchies, networks as distinct ways of arranging power, incentives, and trust over information flows.
+
+4. Intelligence, propaganda, and epistemic systems
+Tier‑0 used: Information + Epistemics + Power + Objective function + Trust
+
+Intelligence system:  
+Structured collection, processing, and use of information to improve decisions under an objective function.
+
+Intelligence
+=
+(
+Sensing
+,
+Inference
+,
+Dissemination
+)
+Propaganda system:  
+Structured manipulation of others’ epistemics to steer their behavior toward your objective function.
+
+Propaganda
+=
+(
+Message design
+,
+Channel control
+,
+Target epistemics
+)
+Epistemic commons:  
+Shared infrastructure for truth‑seeking (science, journalism, courts), relying on trust and conflict containment.
+
+Epistemic commons
+=
+(
+Institutions
+,
+Norms
+,
+Verification protocols
+)
+Tier‑1 concepts:  
+Intelligence, propaganda, epistemic commons as structured uses of information + epistemics + power.
+
+5. Deterrence, escalation, and bargaining
+Tier‑0 used: Power + Incentives + Trust + Conflict containment + Transformation + Objective function
+
+Deterrence:  
+Using credible threat of future transformation (harm) to shape current incentives.
+
+Deterrence
+=
+(
+Threat capability
+,
+Credibility
+,
+Perceived payoffs
+)
+Escalation ladder:  
+Ordered set of possible transformations (sanctions → limited strikes → total war) with increasing cost and risk.
+
+Escalation ladder
+=
+{
+Transformation
+0
+,
+Transformation
+1
+,
+…
+}
+Bargaining:  
+Strategic adjustment of offers and threats to reach a mutually acceptable transformation of reality.
+
+Bargain
+=
+Search over transformations s.t. incentives align enough
+Tier‑1 concepts:  
+Deterrence, escalation, bargaining as structured interplay of power, incentives, and containment.
+
+6. Legitimacy, norms, and narratives
+Tier‑0 used: Trust + Epistemics + Incentives + Objective function + Conflict containment
+
+Norm:  
+Shared expectation about appropriate behavior, enforced by social incentives.
+
+Norm
+=
+(
+Expectation
+,
+Sanction pattern
+)
+Legitimacy:  
+Widespread belief that an institution or authority is rightful, which lowers enforcement cost and raises compliance.
+
+Legitimacy
+=
+Trust in the rightness of rules/roles
+Narrative:  
+Coherent story that organizes epistemics, incentives, and identity to stabilize trust and behavior.
+
+Narrative
+=
+(
+Framing of reality
+,
+Moral structure
+,
+Promised outcomes
+)
+Tier‑1 concepts:  
+Norms, legitimacy, narratives as epistemic‑trust structures that shape incentives and containment.
+
+7. War, peace, and regimes
+Now plug Tier‑0 directly into your peace/war framing.
+
+Tier‑0 used: Power + Incentives + Trust + Conflict containment + Transformation + Objective function + Information + Epistemics
+
+Peace regime:  
+A configuration where conflict is contained primarily by institutions, norms, and non‑violent transformations; trust and epistemic commons are sufficiently intact.
+
+Peace
+≈
+(
+High containment
+,
+High trust
+,
+Low direct coercive transformation
+)
+War regime:  
+A configuration where conflict containment has partially failed, and power is applied through violent transformations; trust collapses across key boundaries.
+
+War
+≈
+(
+Low containment
+,
+Low trust
+,
+High direct coercive transformation
+)
+Hybrid regime:  
+Mixed use of violent and non‑violent tools under partial containment (cold war, proxy war, sanctions + limited strikes).
+
+Tier‑1 concepts:  
+Peace regimes, war regimes, hybrid regimes as specific regions in your geometry, built from Tier‑0 primitives.
+
+8. Why this matters for you
+Tier‑0 is your minimal ontology.
+Tier‑1 is your first derived basis—the standard objects everyone already talks about (markets, states, war, peace, institutions, propaganda, deterrence), but now:
+
+each has an explicit decomposition into Tier‑0 primitives
+
+you can show how changing a primitive (e.g., trust, epistemics) changes the Tier‑1 object
+
+you can model transitions: peace‑regime → war‑regime as a trajectory in Tier‑0 space

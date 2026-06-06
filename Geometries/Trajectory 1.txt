@@ -1,0 +1,309 @@
+Trajectory 1: Stable peace → internal war (scope = state)
+Variables:
+
+T: cross‑faction trust (0–1)
+
+C: containment strength (0–1)
+
+E: epistemic quality (0–1)
+
+G: grievance/pressure (0–1)
+
+P: power asymmetry (0–1)
+
+κ: context (−1 = hostile, +1 = cooperative)
+
+Initial state 
+𝑡
+=
+0
+: “High peace”
+T = 0.8 (high trust)
+
+C = 0.9 (strong institutions, courts, norms)
+
+E = 0.8 (decent media, low disinfo)
+
+G = 0.2 (some discontent, mostly managed)
+
+P = 0.3 (moderate asymmetry)
+
+κ = +0.7 (cooperative/mixed‑motive)
+
+System is in your peace region 
+𝑃
+.
+
+𝑡
+=
+1
+: Epistemic erosion begins
+A polarizing media ecosystem and targeted disinfo campaigns ramp up.
+
+E drops: 0.8 → 0.6
+
+Misperceptions rise; factions start believing worst‑case stories about each other.
+
+Updates:
+
+T: 0.8 → 0.7 (less willing to assume good faith)
+
+C: still 0.9 (institutions intact, but under rhetorical attack)
+
+G: 0.2 → 0.3 (more perceived slights)
+
+κ: +0.7 → +0.5
+
+𝑡
+=
+2
+: Trust decay and institutional strain
+A contested election or scandal hits; narratives diverge completely.
+
+E: 0.6 → 0.4
+
+Each side has its own “facts.”
+
+Updates:
+
+T: 0.7 → 0.5 (cross‑faction cooperation feels risky)
+
+C: 0.9 → 0.75 (non‑compliance with rulings, politicization of courts)
+
+G: 0.3 → 0.45 (no shared forum to resolve disputes)
+
+P: 0.3 → 0.4 (one faction gains more coercive tools)
+
+κ: +0.5 → +0.2
+
+System is now in a brittle “cold peace” region.
+
+𝑡
+=
+3
+: Containment weakening
+Street clashes, selective enforcement, and norm‑breaking by elites.
+
+C: 0.75 → 0.55 (rules applied unevenly, some institutions captured)
+
+E: 0.4 → 0.35 (open lying, conspiracy narratives normalized)
+
+Updates:
+
+T: 0.5 → 0.35 (people expect bad faith)
+
+G: 0.45 → 0.6 (unaddressed harms, humiliation)
+
+P: 0.4 → 0.5 (security forces align with one side)
+
+κ: +0.2 → −0.1 (system crosses into adversarial framing)
+
+You’ve crossed a qualitative threshold: factions now see each other as enemies, not opponents.
+
+𝑡
+=
+4
+: Trigger event and cascade
+A massacre, coup attempt, or assassination occurs.
+
+G spikes: 0.6 → 0.85
+
+T collapses: 0.35 → 0.15
+
+C: 0.55 → 0.3 (institutions paralyzed or openly defied)
+
+E: 0.35 → 0.25 (fog of war, rumors dominate)
+
+P: 0.5 → 0.7 (one side seizes key assets)
+
+Update:
+
+κ: −0.1 → −0.6
+
+Violent options now look locally rational; non‑violent channels are seen as rigged or suicidal.
+
+System has entered your war region 
+𝑊
+.
+
+𝑡
+=
+5
+: Consolidated internal war
+Open fighting, ethnic cleansing, or large‑scale repression.
+
+T ≈ 0.05 (trust only within tight in‑groups)
+
+C ≈ 0.15 (some local ceasefires, but no system‑wide containment)
+
+E ≈ 0.2 (information weaponized)
+
+G ≈ 0.9 (fresh atrocities)
+
+P ≈ 0.8 (dominant warlords/commanders)
+
+κ ≈ −0.8
+
+You can literally see the trajectory: a slow epistemic and trust slide, then a fast cascade once containment drops below a critical level.
+
+Trajectory 2: Limited interstate war → cold peace (scope = interstate system)
+Same variables, but now between two states A and B.
+
+Initial war state 
+𝑡
+=
+0
+: “Hot but bounded war”
+T = 0.05 (almost no trust)
+
+C = 0.3 (some red lines: no nukes, some third‑party mediation)
+
+E = 0.4 (each side has decent internal epistemics, but no shared truth)
+
+G = 0.9 (fresh invasion, atrocities)
+
+P = 0.6 (moderate asymmetry)
+
+κ = −0.8 (strongly adversarial)
+
+𝑡
+=
+1
+: Ceasefire and external containment spike
+External powers broker a ceasefire; peacekeepers deployed.
+
+C: 0.3 → 0.6 (hard external containment)
+
+P: 0.6 → 0.5 (security guarantees, demilitarized zones)
+
+Updates:
+
+T: 0.05 → 0.08 (tiny, but non‑zero: they honor the ceasefire for a week)
+
+G: 0.9 → 0.85 (no new atrocities, but old ones unresolved)
+
+E: 0.4 → 0.45 (monitoring, observers reduce some uncertainty)
+
+κ: −0.8 → −0.6
+
+Still war‑like, but the slide has stopped.
+
+𝑡
+=
+2
+: Monitoring and verification
+Joint monitoring, hotlines, and verification of withdrawals.
+
+E: 0.45 → 0.55 (fewer surprises, more shared facts about compliance)
+
+C: 0.6 → 0.65 (ceasefire mechanisms prove workable)
+
+Updates:
+
+T: 0.08 → 0.12 (they see the other side sometimes keeps its word)
+
+G: 0.85 → 0.8 (no justice yet, but fear of immediate attack drops)
+
+κ: −0.6 → −0.4
+
+𝑡
+=
+3
+: Structured bargaining
+Negotiations on borders, reparations, and security guarantees.
+
+C: 0.65 → 0.7 (more institutionalized channels)
+
+E: 0.55 → 0.6 (shared maps, data, third‑party reports)
+
+P: 0.5 → 0.45 (arms limits, observers)
+
+Updates:
+
+T: 0.12 → 0.18 (repeated, verified concessions)
+
+G: 0.8 → 0.7 (some concessions, partial reparations)
+
+κ: −0.4 → −0.2
+
+System is now in a “cold peace / frozen conflict” band.
+
+𝑡
+=
+4
+: Normalization without forgiveness
+Trade corridors reopen, limited travel resumes, embassies staffed.
+
+C: 0.7 → 0.8 (dense non‑violent interdependence)
+
+E: 0.6 → 0.65 (less propaganda about imminent annihilation)
+
+T: 0.18 → 0.25 (they expect the other side to honor basic deals)
+
+G: 0.7 → 0.6 (no full justice, but daily life improves)
+
+κ: −0.2 → 0.0
+
+They are no longer in active war, but not in warm cooperation either—classic cold peace.
+
+𝑡
+=
+5
+: Stable cold peace
+T ≈ 0.3
+
+C ≈ 0.8
+
+E ≈ 0.65
+
+G ≈ 0.55
+
+P ≈ 0.45
+
+κ ≈ +0.1
+
+The system sits near the boundary of your peace region: conflict is contained, incentives for renewed war are low but not gone.
+
+How this plugs back into your substrate
+For each trajectory, you can now:
+
+treat 
+(
+𝑇
+,
+𝐶
+,
+𝐸
+,
+𝐺
+,
+𝑃
+,
+𝜅
+)
+ as a coarse slice of your full state 
+𝑋
+𝑡
+
+see the transition dynamics as a specific form of 
+𝐹
+ on your runtime axis
+
+locate each step as a point 
+Π
+𝑡
+=
+(
+𝑆
+𝑡
+,
+𝑅
+𝑡
+,
+𝜎
+,
+𝜅
+𝑡
+,
+𝜏
+)
