@@ -1,0 +1,1 @@
+The geometries.zip contains the domain agnostic engine, .json and .js files ingested by the engine for the coordination domain, and example core bootstrap for the .js coordination file :)
