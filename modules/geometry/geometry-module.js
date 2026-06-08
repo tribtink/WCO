@@ -5,7 +5,7 @@
 import {
   Substrate,
   applyDomainSpec
-} from "../../geomotries.js";
+} from "../../geometries.js";
 
 export default {
   name: "geometry",
